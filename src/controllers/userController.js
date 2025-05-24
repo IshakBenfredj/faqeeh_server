@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const asyncHandler = require("express-async-handler");
 const { sendMail, sendWelcomeEmail } = require("../lib/nodemailer");
+const Course = require("../models/Course");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -176,6 +177,63 @@ const addCourseToUsers = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Add a free course to the currently authenticated user's purchasedCourses
+ * @route   POST /api/users/addFreeCourse
+ * @access  Private
+ */
+const addFreeCourseToUser = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { courseId } = req.body;
+
+  try {
+    const course = await Course.findById(courseId);
+    if (!course) {
+      return res.status(404).json({
+        message: "الدورة غير موجودة",
+        success: false,
+      });
+    }
+
+    if (course.price != 0) {
+      return res.status(400).json({
+        message: "يمكن إضافة الدورات المجانية فقط بهذه الطريقة",
+        success: false,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "المستخدم غير موجود",
+        success: false,
+      });
+    }
+
+    if (user.purchasedCourses.includes(courseId)) {
+      return res.status(400).json({
+        message: "الدورة مضافة بالفعل",
+        success: false,
+      });
+    }
+
+    user.purchasedCourses.push(courseId);
+    await user.save();
+
+    res.status(200).json({
+      message: "تمت إضافة الدورة المجانية بنجاح",
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("Add free course error:", error);
+    res.status(500).json({
+      message: "حدث خطأ أثناء إضافة الدورة المجانية",
+      success: false,
+    });
+  }
+});
+
 // @desc    Remove course from user's purchasedCourses
 // @route   DELETE /api/users/:userId/removeCourse/:courseId
 // @access  Private
@@ -248,4 +306,5 @@ module.exports = {
   removeCourseFromUser,
   getUsersWithCourse,
   getUsersWithoutCourse,
+  addFreeCourseToUser
 };

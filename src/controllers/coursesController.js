@@ -265,6 +265,8 @@ const updateCourse = asyncHandler(async (req, res) => {
       return;
     }
 
+    console.log('price', price)
+
     let url = "";
     if (req.file?.path) {
       const oldImgId = course.image ? extractIdFromUrl(course.image) : "";
@@ -278,8 +280,8 @@ const updateCourse = asyncHandler(async (req, res) => {
 
     course.title = title || course.title;
     course.description = description || course.description;
-    course.price = price || course.price;
-    course.originalPrice = originalPrice || course.originalPrice;
+    if (price !== undefined) course.price = price;
+    if (originalPrice !== undefined) course.originalPrice = originalPrice;
     course.image = url || course.image;
     course.duration = duration || course.duration;
     course.category = category || course.category;
