@@ -298,6 +298,76 @@ const getUsersWithoutCourse = asyncHandler(async (req, res) => {
   }
 });
 
+
+/**
+ * @desc    Update general user info (excluding role and password)
+ * @route   PUT /api/users/:userId/updateInfo
+ * @access  Private
+ */
+const updateUserInfo = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { fullName, email, phoneNumber } = req.body;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+    }
+
+    if (req.body.role || req.body.password) {
+      return res.status(400).json({ message: "لا يمكن تعديل الدور أو كلمة المرور من هنا", success: false });
+    }
+
+    if (email && email.toLowerCase() !== user.email) {
+      const emailExists = await User.findOne({ email: email.toLowerCase() });
+      if (emailExists) {
+        return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل", success: false });
+      }
+      user.email = email.toLowerCase();
+    }
+
+    if (fullName) user.fullName = fullName;
+    if (phoneNumber) user.phoneNumber = phoneNumber;
+
+    await user.save();
+
+    res.status(200).json({ message: "تم تحديث المعلومات بنجاح", success: true, user });
+  } catch (error) {
+    console.error("Update user info error:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء تحديث المعلومات", success: false });
+  }
+});
+
+/**
+ * @desc    Update user password
+ * @route   PUT /api/users/:userId/updatePassword
+ * @access  Private
+ */
+const updateUserPassword = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { oldPassword, newPassword } = req.body;
+
+  try {
+    const user = await User.findById(userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+    }
+
+    const isMatch = await user.comparePassword(oldPassword);
+    if (!isMatch) {
+      return res.status(400).json({ message: "كلمة المرور القديمة غير صحيحة", success: false });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({ message: "تم تحديث كلمة المرور بنجاح", success: true });
+  } catch (error) {
+    console.error("Update password error:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء تحديث كلمة المرور", success: false });
+  }
+});
+
 module.exports = {
   register,
   login,
@@ -306,5 +376,7 @@ module.exports = {
   removeCourseFromUser,
   getUsersWithCourse,
   getUsersWithoutCourse,
+  updateUserInfo,
+  updateUserPassword,
   addFreeCourseToUser
 };

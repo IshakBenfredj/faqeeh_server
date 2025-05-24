@@ -68,6 +68,25 @@ const getCourseRatings = async (req, res) => {
   }
 };
 
+
+/**
+ * @desc    Get all ratings by user id, populate course
+ * @route   GET /api/ratings/user/:userId
+ * @access  Public or Private (depending on your needs)
+ */
+const getUserRatings = async (req, res) => {
+  try {
+    const ratings = await Rating.find({ user: req.params.userId })
+      .populate("course")
+      .populate("user")
+      .sort({ createdAt: -1 });
+
+    res.json(ratings);
+  } catch (error) {
+    res.status(res.statusCode || 500).json({ message: error.message });
+  }
+};
+
 // @desc    Update rating
 // @route   PUT /api/ratings/:id
 // @access  Private
@@ -138,4 +157,5 @@ module.exports = {
   updateRating,
   deleteRating,
   validateRating,
+  getUserRatings
 };
