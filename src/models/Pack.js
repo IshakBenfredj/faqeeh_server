@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const listSchema = new mongoose.Schema(
+const packSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     image: { type: String, required: true },
@@ -14,13 +14,13 @@ const listSchema = new mongoose.Schema(
 );
 
 // Virtual for getting courses in this list
-listSchema.virtual("courses", {
+packSchema.virtual("courses", {
   ref: "Course",
   localField: "_id",
   foreignField: "list",
 });
 
-listSchema.set("toJSON", { virtuals: true });
-listSchema.set("toObject", { virtuals: true });
+packSchema.set("toJSON", { virtuals: true });
+packSchema.set("toObject", { virtuals: true });
 
-module.exports = mongoose.model("List", listSchema);
+module.exports = mongoose.model("List", packSchema);

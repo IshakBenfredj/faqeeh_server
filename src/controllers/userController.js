@@ -130,6 +130,22 @@ const login = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Get users 
+// @route   GET /api/users
+// @access  Private
+const getUsers = asyncHandler(async (req, res) => {
+  try {
+    const users = await User.find({ role: { $ne: "admin" } });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Get users with course error:", error);
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء جلب المستخدمين", success: false });
+  }
+});
+
 // @desc    Add course to user's purchasedCourses
 // @route   PUT /api/users/addCourse
 // @access  Private
@@ -368,15 +384,45 @@ const updateUserPassword = asyncHandler(async (req, res) => {
   }
 });
 
+
+/**
+ * @desc    Delete a user (role not equal to admin)
+ * @route   DELETE /api/users/:userId
+ * @access  Private
+ */
+const deleteUser = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+    }
+
+    if (user.role === "admin") {
+      return res.status(403).json({ message: "لا يمكن حذف حساب المدير", success: false });
+    }
+
+    await user.deleteOne();
+
+    res.status(200).json({ message: "تم حذف المستخدم بنجاح", success: true });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء حذف المستخدم", success: false });
+  }
+});
+
 module.exports = {
   register,
   login,
   confirmEmail,
+  getUsers,
   addCourseToUsers,
   removeCourseFromUser,
   getUsersWithCourse,
   getUsersWithoutCourse,
   updateUserInfo,
   updateUserPassword,
-  addFreeCourseToUser
+  addFreeCourseToUser,
+  deleteUser
 };

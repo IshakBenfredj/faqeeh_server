@@ -7,6 +7,8 @@ const Section = require("../models/Section");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const extractIdFromUrl = require("../lib/extractIdFromUrl");
+const Quiz = require("../models/Quiz");
+const UserQuizResult = require("../models/UserQuizResult");
 
 // @desc    Get all courses
 // @route   GET /api/courses
@@ -126,10 +128,12 @@ const getCourse = asyncHandler(async (req, res) => {
     const course = await Course.findById(req.params.id).populate("category");
     if (!course) {
       res.json({});
+      return;
     }
 
     if (!course.isActive && (!user || user.role !== "admin")) {
       res.json({});
+      return;
     }
 
     const ratings = await Rating.find({ course: course._id }).populate("user");
@@ -197,6 +201,29 @@ const getCourse = asyncHandler(async (req, res) => {
       0
     );
 
+    // Check if this course has a quiz
+    const hasQuiz = await Quiz.exists({ course: course._id });
+
+    // If user is a normal user, check if he answered the quiz and get his note
+    let userQuizInfo = null;
+    if (user && user.role === "user" && hasQuiz) {
+      const quizResult = await UserQuizResult.findOne({
+        user: user._id,
+        course: course._id,
+      });
+      if (quizResult) {
+        userQuizInfo = {
+          note: quizResult.score,
+          isAnswered: true,
+        };
+      } else {
+        userQuizInfo = {
+          note: null,
+          isAnswered: false,
+        };
+      }
+    }
+
     const courseData = {
       ...course._doc,
       ratings,
@@ -209,6 +236,8 @@ const getCourse = asyncHandler(async (req, res) => {
       totalRatings: ratings.length,
       duration: totalDuration,
       studentsCount,
+      hasQuiz: !!hasQuiz,
+      ...(userQuizInfo && { userQuizInfo }),
     };
 
     res.json(courseData);
