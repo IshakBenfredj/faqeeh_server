@@ -4,43 +4,33 @@ const {
   deleteFromCloudinary,
 } = require("../lib/cloudinary");
 const Pack = require("../models/Pack");
+const User = require("../models/User");
 const extractIdFromUrl = require("../lib/extractIdFromUrl");
 
-
-
-// @desc    Get all packs with ratings and courses
+// @desc    Get all packs
 // @route   GET /api/packs
 // @access  Public
 const getPacks = asyncHandler(async (req, res) => {
   try {
-    const packs = await Pack.find().populate("category");
-
+    const packs = await Pack.find().populate("courses");
     res.json(packs);
   } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, message: "حدث خطأ أثناء جلب الحزم" });
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقات" });
   }
 });
 
-// @desc    Get single pack with ratings and courses
+// @desc    Get single pack
 // @route   GET /api/packs/:id
 // @access  Public
 const getPack = asyncHandler(async (req, res) => {
   try {
-    const pack = await Pack.findById(req.params.id).populate("category");
-
+    const pack = await Pack.findById(req.params.id).populate("courses");
     if (!pack) {
-      return res
-        .status(404)
-        .json({ success: false, message: "الحزمة غير موجودة" });
+      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
     }
-
     res.json(pack);
   } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, message: "حدث خطأ أثناء جلب الحزمة" });
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقة" });
   }
 });
 
@@ -49,7 +39,7 @@ const getPack = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const createPack = asyncHandler(async (req, res) => {
   try {
-    const { title, category } = req.body;
+    const { title, description, price, courses } = req.body;
     let imageUrl = "";
 
     if (req.file) {
@@ -59,74 +49,66 @@ const createPack = asyncHandler(async (req, res) => {
 
     const pack = await Pack.create({
       title,
-      category,
+      description,
+      price,
+      courses,
       image: imageUrl,
     });
 
-    pack.courses = [];
-
-    const populatedPack = await pack.populate("category");
+    const populatedPack = await pack.populate("courses");
 
     res.status(201).json({
       success: true,
       pack: populatedPack,
-      message: "تم إنشاء الحزمة بنجاح",
+      message: "تم إنشاء الباقة بنجاح",
     });
   } catch (error) {
     console.log(error);
     res.status(500).json({
       success: false,
-      message: "حدث خطأ أثناء إنشاء الحزمة",
+      message: "حدث خطأ أثناء إنشاء الباقة",
     });
   }
 });
-
 
 // @desc    Update pack
 // @route   PUT /api/packs/:id
 // @access  Private/Admin
 const updatePack = asyncHandler(async (req, res) => {
   try {
-    const { title, category,image } = req.body;
-
-    console.log('image', image);
-    
+    const { title, description, price, courses, image } = req.body;
     const pack = await Pack.findById(req.params.id);
 
     if (!pack) {
-      return res
-        .status(404)
-        .json({ success: false, message: "الحزمة غير موجودة" });
+      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
     }
 
     pack.title = title || pack.title;
-    pack.category = category || pack.category;
+    pack.description = description || pack.description;
+    pack.price = price || pack.price;
+    pack.courses = courses || pack.courses;
 
-    if (typeof image != 'string') {
+    if (typeof image !== 'string' && req.file) {
       if (pack.image) {
         const imageId = extractIdFromUrl(pack.image);
         if (imageId) {
           await deleteFromCloudinary(imageId);
         }
       }
-
-      // ارفع الصورة الجديدة
       const result = await uploadImageToCloudinary(req.file.path);
       pack.image = result.secure_url;
     }
 
     const updatedPack = await pack.save();
-    const populatedPack = await updatedPack.populate("category");
+    const populatedPack = await updatedPack.populate("courses");
     res.json({
-      message: "تم تحديث الحزمة بنجاح",
+      message: "تم تحديث الباقة بنجاح",
       success: true,
       updated: populatedPack,
     });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({ success: false, message: "حدث خطأ أثناء تحديث الحزمة" });
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء تحديث الباقة" });
   }
 });
 
@@ -138,9 +120,7 @@ const deletePack = asyncHandler(async (req, res) => {
     const pack = await Pack.findById(req.params.id);
 
     if (!pack) {
-      return res
-        .status(404)
-        .json({ success: false, message: "الحزمة غير موجودة" });
+      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
     }
     const imageId = extractIdFromUrl(pack.image);
     if (imageId) {
@@ -148,12 +128,26 @@ const deletePack = asyncHandler(async (req, res) => {
     }
 
     await pack.deleteOne();
-    res.json({ success: true, message: "تم حذف الحزمة بنجاح" });
+    res.json({ success: true, message: "تم حذف الباقة بنجاح" });
   } catch (error) {
     console.log(error);
-    res
-      .status(500)
-      .json({ success: false, message: "حدث خطأ أثناء حذف الحزمة" });
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء حذف الباقة" });
+  }
+});
+
+// @desc    Get packs purchased by user
+// @route   GET /api/packs/purchased
+// @access  Private
+const getPurchasedPacks = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("purchasedPacks");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "المستخدم غير موجود" });
+    }
+    const packs = await Pack.find({ _id: { $in: user.purchasedPacks } }).populate("courses");
+    res.json(packs);
+  } catch (error) {
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقات المشتراة" });
   }
 });
 
@@ -163,4 +157,5 @@ module.exports = {
   createPack,
   updatePack,
   deletePack,
+  getPurchasedPacks,
 };
