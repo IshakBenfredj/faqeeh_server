@@ -24,11 +24,17 @@ const getPacks = asyncHandler(async (req, res) => {
 // @access  Public
 const getPack = asyncHandler(async (req, res) => {
   try {
-    const pack = await Pack.findById(req.params.id).populate("courses");
+    const pack = await Pack.findById(req.params.id).populate({
+      path: "courses",
+      populate: { path: "category" }
+    });
     if (!pack) {
       return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
     }
-    res.json(pack);
+
+    const studentsCount = await User.countDocuments({ purchasedPacks: pack._id });
+
+    res.json({ ...pack.toObject(), studentsCount });
   } catch (error) {
     res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقة" });
   }

@@ -3,6 +3,7 @@ const User = require("../models/User");
 const asyncHandler = require("express-async-handler");
 const { sendMail, sendWelcomeEmail } = require("../lib/nodemailer");
 const Course = require("../models/Course");
+const Pack = require("../models/Pack");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -314,6 +315,177 @@ const getUsersWithoutCourse = asyncHandler(async (req, res) => {
   }
 });
 
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+// @desc    Add course to user's purchasedPacks
+// @route   PUT /api/users/addPack
+// @access  Private
+const addPackToUsers = asyncHandler(async (req, res) => {
+  const { userIds, packId } = req.body;
+
+  try {
+    const users = await User.find({ _id: { $in: userIds } });
+    if (users.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "لم يتم العثور على أي مستخدمين", success: false });
+    }
+
+    const updatedUsers = [];
+    for (const user of users) {
+      if (!user.purchasedPacks.includes(packId)) {
+        user.purchasedPacks.push(packId);
+        await user.save();
+        updatedUsers.push(user);
+      }
+    }
+
+    if (updatedUsers.length === 0) {
+      return res
+        .status(400)
+        .json({
+          message: "الباقة مضافة بالفعل لجميع المستخدمين",
+          success: false,
+        });
+    }
+
+    res
+      .status(200)
+      .json({
+        message: "تمت إضافة الباقة بنجاح للمستخدمين",
+        success: true,
+        data :updatedUsers,
+      });
+  } catch (error) {
+    console.error("Add error:", error);
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء إضافة الباقة", success: false });
+  }
+});
+
+/**
+ * @desc    Add a free pack to the currently authenticated user's purchasedPacks
+ * @route   POST /api/users/addFreePack
+ * @access  Private
+ */
+const addFreePackToUser = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+  const { packId } = req.body;
+
+  try {
+    const pack = await Pack.findById(packId);
+    if (!pack) {
+      return res.status(404).json({
+        message: "الباقة غير موجودة",
+        success: false,
+      });
+    }
+
+    if (pack.price != 0) {
+      return res.status(400).json({
+        message: "يمكن إضافة الباقات المجانية فقط بهذه الطريقة",
+        success: false,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "المستخدم غير موجود",
+        success: false,
+      });
+    }
+
+    if (user.purchasedPacks.includes(packId)) {
+      return res.status(400).json({
+        message: "الباقة مضافة بالفعل",
+        success: false,
+      });
+    }
+
+    user.purchasedPacks.push(packId);
+    await user.save();
+
+    res.status(200).json({
+      message: "تمت إضافة الباقة المجانية بنجاح",
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("Add free pack error:", error);
+    res.status(500).json({
+      message: "حدث خطأ أثناء إضافة الدورة المجانية",
+      success: false,
+    });
+  }
+});
+
+// @desc    Remove pack from user's purchasedPacks
+// @route   DELETE /api/users/:userId/removePack/:packId
+// @access  Private
+const removePackFromUser = asyncHandler(async (req, res) => {
+  const { userId, packId } = req.params;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "المستخدم غير موجود", success: false });
+    }
+
+    user.purchasedPacks = user.purchasedPacks.filter(
+      (id) => id.toString() !== packId
+    );
+    await user.save();
+
+    res.status(200).json({ message: "تمت إزالة الباقة بنجاح", success: true });
+  } catch (error) {
+    console.error("Remove pack error:", error);
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء إزالة الباقة", success: false });
+  }
+});
+
+// @desc    Get users who have a specific pack
+// @route   GET /api/users/withPack/:packId
+// @access  Private
+const getUsersWithPack = asyncHandler(async (req, res) => {
+  const { packId } = req.params;
+
+  try {
+    const users = await User.find({ purchasedPacks: packId, role: { $ne: "admin" } });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Get users with pack error:", error);
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء جلب المستخدمين", success: false });
+  }
+});
+
+// @desc    Get users who do not have a specific pack
+// @route   GET /api/users/withoutPack/:packId
+// @access  Private
+const getUsersWithoutPack = asyncHandler(async (req, res) => {
+  const { packId } = req.params;
+
+  try {
+    const users = await User.find({ purchasedPacks: { $ne: packId } });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Get users without pack error:", error);
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء جلب المستخدمين", success: false });
+  }
+});
+
 
 /**
  * @desc    Update general user info (excluding role and password)
@@ -421,8 +593,13 @@ module.exports = {
   removeCourseFromUser,
   getUsersWithCourse,
   getUsersWithoutCourse,
+  getUsersWithPack,
+  getUsersWithoutPack,
   updateUserInfo,
   updateUserPassword,
   addFreeCourseToUser,
-  deleteUser
+  deleteUser,
+  addPackToUsers,
+  addFreePackToUser,
+  removePackFromUser,
 };

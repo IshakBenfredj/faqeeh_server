@@ -12,19 +12,30 @@ const {
   updateUserPassword,
   getUsers,
   deleteUser,
+  getUsersWithoutPack,
+  getUsersWithPack,
+  addPackToUsers,
+  removePackFromUser,
+  addFreePackToUser,
 } = require("../controllers/userController");
 const { protect, admin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+// Auth Routes
 router.post("/register", register);
 router.post("/login", login);
 router.post("/confirmEmail", confirmEmail);
+
+// User Management Routes
 router.get("/", protect, admin, getUsers);
-router.post("/addFreeCourse", protect, addFreeCourseToUser);
-router.put("/addCourse", protect, admin, addCourseToUsers);
 router.put("/:userId/updateInfo", protect, updateUserInfo);
 router.put("/:userId/updatePassword", protect, updateUserPassword);
+router.delete("/:userId", protect, admin, deleteUser);
+
+// Course Management Routes
+router.post("/addFreeCourse", protect, addFreeCourseToUser);
+router.put("/addCourse", protect, admin, addCourseToUsers);
 router.delete(
   "/:userId/removeCourse/:courseId",
   protect,
@@ -33,6 +44,17 @@ router.delete(
 );
 router.get("/withCourse/:courseId", protect, admin, getUsersWithCourse);
 router.get("/withoutCourse/:courseId", protect, admin, getUsersWithoutCourse);
-router.delete("/:userId", protect, admin, deleteUser);
+
+// Pack Management Routes
+router.post("/addFreePack", protect, addFreePackToUser);
+router.put("/addPack", protect, admin, addPackToUsers);
+router.delete(
+  "/:userId/removePack/:packId",
+  protect,
+  admin,
+  removePackFromUser
+);
+router.get("/withPack/:packId", protect, admin, getUsersWithPack);
+router.get("/withoutPack/:packId", protect, admin, getUsersWithoutPack);
 
 module.exports = router;

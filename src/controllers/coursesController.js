@@ -9,6 +9,7 @@ const User = require("../models/User");
 const extractIdFromUrl = require("../lib/extractIdFromUrl");
 const Quiz = require("../models/Quiz");
 const UserQuizResult = require("../models/UserQuizResult");
+const Pack = require("../models/Pack");
 
 // @desc    Get all courses
 // @route   GET /api/courses
@@ -150,9 +151,18 @@ const getCourse = asyncHandler(async (req, res) => {
       purchasedCourses: course._id,
     });
 
-    const hasAccess =
-      user &&
-      (user.role === "admin" || user.purchasedCourses.includes(course._id));
+    // Check if user has access: admin, purchased course, or purchased a pack containing the course
+    let hasAccess = false;
+    if (user) {
+      if (user.role === "admin" || user.purchasedCourses.includes(course._id)) {
+        hasAccess = true;
+      } else if (user.purchasedPacks && user.purchasedPacks.length > 0) {
+        const packs = await Pack.find({ _id: { $in: user.purchasedPacks }, courses: course._id });
+        if (packs && packs.length > 0) {
+          hasAccess = true;
+        }
+      }
+    }
 
     const videosBySection = {};
 
@@ -236,6 +246,7 @@ const getCourse = asyncHandler(async (req, res) => {
       totalRatings: ratings.length,
       duration: totalDuration,
       studentsCount,
+      hasAccess,
       hasQuiz: !!hasQuiz,
       ...(userQuizInfo && { userQuizInfo }),
     };

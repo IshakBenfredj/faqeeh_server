@@ -12,6 +12,11 @@ const userSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.ObjectId],
       ref: "Course",
       default: [],
+    },
+    purchasedPacks : {
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Pack",
+      default: [],
     }
   },
   { timestamps: true }
