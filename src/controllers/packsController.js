@@ -13,9 +13,20 @@ const extractIdFromUrl = require("../lib/extractIdFromUrl");
 const getPacks = asyncHandler(async (req, res) => {
   try {
     const packs = await Pack.find().populate("courses");
-    res.json(packs);
+    // Get studentsCount for each pack
+    const packsWithStudentsCount = await Promise.all(
+      packs.map(async (pack) => {
+        const studentsCount = await User.countDocuments({
+          purchasedPacks: pack._id,
+        });
+        return { ...pack.toObject(), studentsCount };
+      })
+    );
+    res.json(packsWithStudentsCount);
   } catch (error) {
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقات" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء جلب الباقات" });
   }
 });
 
@@ -26,17 +37,31 @@ const getPack = asyncHandler(async (req, res) => {
   try {
     const pack = await Pack.findById(req.params.id).populate({
       path: "courses",
-      populate: { path: "category" }
+      populate: { path: "category" },
     });
     if (!pack) {
-      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
+      return res
+        .status(404)
+        .json({ success: false, message: "الباقة غير موجودة" });
     }
 
-    const studentsCount = await User.countDocuments({ purchasedPacks: pack._id });
+    const studentsCount = await User.countDocuments({
+      purchasedPacks: pack._id,
+    });
 
-    res.json({ ...pack.toObject(), studentsCount });
+    let hasAccess = false;
+    if (req.user) {
+      const user = await User.findById(req.user._id).select("purchasedPacks");
+      if (user && user.purchasedPacks.some(id => id.equals(pack._id))) {
+        hasAccess = true;
+      }
+    }
+
+    res.json({ ...pack.toObject(), studentsCount, hasAccess });
   } catch (error) {
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقة" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء جلب الباقة" });
   }
 });
 
@@ -86,7 +111,9 @@ const updatePack = asyncHandler(async (req, res) => {
     const pack = await Pack.findById(req.params.id);
 
     if (!pack) {
-      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
+      return res
+        .status(404)
+        .json({ success: false, message: "الباقة غير موجودة" });
     }
 
     pack.title = title || pack.title;
@@ -94,7 +121,7 @@ const updatePack = asyncHandler(async (req, res) => {
     pack.price = price || pack.price;
     pack.courses = courses || pack.courses;
 
-    if (typeof image !== 'string' && req.file) {
+    if (typeof image !== "string" && req.file) {
       if (pack.image) {
         const imageId = extractIdFromUrl(pack.image);
         if (imageId) {
@@ -114,7 +141,9 @@ const updatePack = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء تحديث الباقة" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء تحديث الباقة" });
   }
 });
 
@@ -126,7 +155,9 @@ const deletePack = asyncHandler(async (req, res) => {
     const pack = await Pack.findById(req.params.id);
 
     if (!pack) {
-      return res.status(404).json({ success: false, message: "الباقة غير موجودة" });
+      return res
+        .status(404)
+        .json({ success: false, message: "الباقة غير موجودة" });
     }
     const imageId = extractIdFromUrl(pack.image);
     if (imageId) {
@@ -137,7 +168,9 @@ const deletePack = asyncHandler(async (req, res) => {
     res.json({ success: true, message: "تم حذف الباقة بنجاح" });
   } catch (error) {
     console.log(error);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء حذف الباقة" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء حذف الباقة" });
   }
 });
 
@@ -148,12 +181,18 @@ const getPurchasedPacks = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("purchasedPacks");
     if (!user) {
-      return res.status(404).json({ success: false, message: "المستخدم غير موجود" });
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
     }
-    const packs = await Pack.find({ _id: { $in: user.purchasedPacks } }).populate("courses");
+    const packs = await Pack.find({
+      _id: { $in: user.purchasedPacks },
+    }).populate("courses");
     res.json(packs);
   } catch (error) {
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب الباقات المشتراة" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء جلب الباقات المشتراة" });
   }
 });
 

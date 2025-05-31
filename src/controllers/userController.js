@@ -270,12 +270,12 @@ const removeCourseFromUser = asyncHandler(async (req, res) => {
     );
     await user.save();
 
-    res.status(200).json({ message: "تمت إزالة الدورة بنجاح", success: true });
+    res.status(200).json({ message: "تمت إزالة الطالب من الدورة بنجاح", success: true });
   } catch (error) {
     console.error("Remove course error:", error);
     res
       .status(500)
-      .json({ message: "حدث خطأ أثناء إزالة الدورة", success: false });
+      .json({ message: "حدث خطأ أثناء إزالة الطالب من الدورة", success: false });
   }
 });
 
@@ -441,12 +441,12 @@ const removePackFromUser = asyncHandler(async (req, res) => {
     );
     await user.save();
 
-    res.status(200).json({ message: "تمت إزالة الباقة بنجاح", success: true });
+    res.status(200).json({ message: "تمت إزالة الطالب من الباقة بنجاح", success: true });
   } catch (error) {
     console.error("Remove pack error:", error);
     res
       .status(500)
-      .json({ message: "حدث خطأ أثناء إزالة الباقة", success: false });
+      .json({ message: "حدث خطأ أثناء إزالة الطالب من الباقة", success: false });
   }
 });
 
