@@ -1,6 +1,6 @@
 const asyncHandler = require("express-async-handler");
 const Video = require("../models/Video");
-const { uploadVideoToCloudinary } = require("../lib/cloudinary");
+const { uploadVideoToCloudinary, generateSignedVideoUrl } = require("../lib/cloudinary");
 const extractIdFromUrl = require("../lib/extractIdFromUrl");
 
 // @desc    Get all videos for a course
@@ -68,6 +68,23 @@ const uploadVideo = asyncHandler(async (req, res) => {
     console.log(error);
   }
 });
+
+// @route GET /api/videos/secure-url/:id
+// @access Private/Protected
+const getSecureVideoUrl = asyncHandler(async (req, res) => {
+  const video = await Video.findById(req.params.id);
+  if (!video || !video.video) {
+    return res.status(404).json();
+  }
+
+  const publicId = extractIdFromUrl(video.video);
+  console.log('publicId', publicId);
+  
+  const signedUrl = generateSignedVideoUrl(publicId);
+
+  res.json(signedUrl);
+});
+
 
 // @desc    Delete a video
 // @route   DELETE /api/videos/:id
@@ -189,4 +206,5 @@ module.exports = {
   deleteVideo,
   updateVideo,
   updateVideoSection,
+  getSecureVideoUrl
 };

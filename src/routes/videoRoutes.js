@@ -6,6 +6,7 @@ const {
   deleteVideo,
   updateVideo,
   updateVideoSection,
+  getSecureVideoUrl,
 } = require("../controllers/videoController");
 const { protect, admin } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
@@ -16,5 +17,7 @@ router.delete("/:id", protect, admin, deleteVideo);
 router
   .put("/:id", protect, admin, upload.single("video"), updateVideo)
   .put("/:id/:section", protect, admin, updateVideoSection);
+
+router.get("/secure-url/:id", protect, getSecureVideoUrl);
 
 module.exports = router;

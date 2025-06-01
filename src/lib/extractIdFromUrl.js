@@ -1,6 +1,6 @@
 function extractIdFromUrl(url) {
-  const match = url.match(/\/packs\/([^\/]+)\.png$/);
-  return match ? `packs/${match[1]}` : null;
+  const match = url.match(/\/(?:video|image)\/upload\/v\d+\/(.+?)\.[a-z0-9]+$/i);
+  return match ? match[1] : null;
 }
 
 module.exports = extractIdFromUrl;

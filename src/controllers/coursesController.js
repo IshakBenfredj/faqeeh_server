@@ -1,6 +1,9 @@
 const asyncHandler = require("express-async-handler");
 const Course = require("../models/Course");
-const { uploadImageToCloudinary, deleteFromCloudinary } = require("../lib/cloudinary");
+const {
+  uploadImageToCloudinary,
+  deleteFromCloudinary,
+} = require("../lib/cloudinary");
 const Rating = require("../models/Rating");
 const Video = require("../models/Video");
 const Section = require("../models/Section");
@@ -157,7 +160,10 @@ const getCourse = asyncHandler(async (req, res) => {
       if (user.role === "admin" || user.purchasedCourses.includes(course._id)) {
         hasAccess = true;
       } else if (user.purchasedPacks && user.purchasedPacks.length > 0) {
-        const packs = await Pack.find({ _id: { $in: user.purchasedPacks }, courses: course._id });
+        const packs = await Pack.find({
+          _id: { $in: user.purchasedPacks },
+          courses: course._id,
+        });
         if (packs && packs.length > 0) {
           hasAccess = true;
         }
@@ -171,15 +177,27 @@ const getCourse = asyncHandler(async (req, res) => {
 
       if (!videosBySection[key]) videosBySection[key] = [];
 
+      // const isAccessible = hasAccess || video.isFree;
+
+      // videosBySection[key].push({
+      //   _id: video._id,
+      //   title: video.title,
+      //   duration: video.duration ?? 0,
+      //   isFree: video.isFree || isAccessible,
+      //   locked: !isAccessible,
+      //   ...(isAccessible && { video: video.video }),
+      //   ...(isAccessible &&
+      //     video.description && { description: video.description }),
+      // });
       const isAccessible = hasAccess || video.isFree;
 
       videosBySection[key].push({
         _id: video._id,
         title: video.title,
         duration: video.duration ?? 0,
-        isFree: video.isFree || isAccessible,
+        isFree: video.isFree,
         locked: !isAccessible,
-        ...(isAccessible && { video: video.video }),
+        ...(video.isFree && { video: video.video }),
         ...(isAccessible &&
           video.description && { description: video.description }),
       });
@@ -305,7 +323,7 @@ const updateCourse = asyncHandler(async (req, res) => {
       return;
     }
 
-    console.log('price', price)
+    console.log("price", price);
 
     let url = "";
     if (req.file?.path) {
