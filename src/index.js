@@ -12,13 +12,14 @@ const ratingRoutes = require("./routes/ratingRoutes");
 const videosRoutes = require("./routes/videoRoutes");
 const sectionRoutes = require("./routes/sectionRoutes");
 const quizRoutes = require('./routes/quizRoutes');
+const messageRoutes = require('./routes/messageRoutes');
 const errorHandler = require("./lib/errorHandler");
 const job = require("./lib/cron");
 
 dotenv.config();
 
 const app = express();
-// job.start();
+job.start();
 
 // Middleware
 app.use(cors());
@@ -42,6 +43,7 @@ app.use("/api/ratings", ratingRoutes);
 app.use("/api/videos", videosRoutes);
 app.use("/api/sections", sectionRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Error handler
 app.use(errorHandler);
