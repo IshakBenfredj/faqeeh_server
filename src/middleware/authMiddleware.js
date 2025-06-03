@@ -16,6 +16,8 @@ const protect = asyncHandler(async (req, res, next) => {
 
       req.user = await User.findById(decoded.id).select("-password");
 
+      console.log("User found:", req.user);
+
       if (!req.user) {
         res.status(401).json({ message: "المستخدم غير موجود", tokenError: true });
         return;

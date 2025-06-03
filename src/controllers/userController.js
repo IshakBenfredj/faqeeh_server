@@ -7,7 +7,7 @@ const Pack = require("../models/Pack");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
+    expiresIn: "60s",
   });
 };
 
@@ -52,7 +52,7 @@ const register = asyncHandler(async (req, res) => {
     }
 
     const userExists = await User.findOne({
-      $or: [{ email: phoneNumber.toLowerCase() }, { phoneNumber }],
+      $or: [{ email: email.toLowerCase() }, { phoneNumber }],
     });
     if (userExists) {
       return res.status(400).json({
@@ -61,17 +61,20 @@ const register = asyncHandler(async (req, res) => {
       });
     }
 
+    const token = generateToken(user._id)
+
     const user = await User.create({
       fullName,
       email: email.toLowerCase(),
       phoneNumber,
       password,
+      token
     });
 
     sendWelcomeEmail(user.email, user.fullName);
     res.status(201).json({
       user,
-      token: generateToken(user._id),
+      token,
       message: "تم إنشاء حسابك بنجاح",
       success: true,
     });
@@ -80,7 +83,6 @@ const register = asyncHandler(async (req, res) => {
     res.status(500).json({
       message: "حدث خطأ أثناء إنشاء الحساب",
       success: false,
-      // error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -97,7 +99,7 @@ const login = asyncHandler(async (req, res) => {
         { email: emailOrPhone.toLowerCase() },
         { phoneNumber: emailOrPhone },
       ],
-    }).select("+password");
+    }).select("+password +token");
 
     if (!user) {
       return res.status(404).json({
@@ -108,17 +110,44 @@ const login = asyncHandler(async (req, res) => {
 
     const passwordCorrect = await user.comparePassword(password);
     if (!passwordCorrect) {
-      return res.status(401).json({
+      return res.status(400).json({
         message: "كلمة المرور غير صحيحة",
         success: false,
       });
     }
 
+    let allowLogin = false;
+    let newToken = null;
+    if (!user.token) {
+      allowLogin = true;
+    } else {
+      try {
+        jwt.verify(user.token, process.env.JWT_SECRET);
+        // Token is valid and not expired
+        allowLogin = false;
+      } catch (err) {
+        // Token expired or invalid
+        allowLogin = true;
+      }
+    }
+
+    if (!allowLogin) {
+      return res.status(403).json({
+        message: "تم تسجيل الدخول بالفعل من جهاز أو متصفح آخر. الرجاء تسجيل الخروج أولاً.",
+        success: false,
+      });
+    }
+
+    newToken = generateToken(user._id);
+    console.log("New token generated:", newToken);
+    user.token = newToken;
+    await user.save();
+
     user.password = undefined;
 
     res.json({
       user,
-      token: generateToken(user._id),
+      token: newToken,
       success: true,
     });
   } catch (error) {
@@ -126,8 +155,45 @@ const login = asyncHandler(async (req, res) => {
     res.status(500).json({
       message: "حدث خطأ أثناء تسجيل الدخول",
       success: false,
-      // error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
+  }
+});
+
+/**
+ * @desc    Logout user (invalidate token)
+ * @route   POST /api/users/logout
+ * @access  Private
+ */
+const logout = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("+token");
+    if (!user) {
+      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+    }
+    user.token = null;
+    await user.save();
+    res.status(200).json({ message: "تم تسجيل الخروج بنجاح", success: true });
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج", success: false });
+  }
+});
+
+/**
+ * @desc    Get current authenticated user data (refresh user info)
+ * @route   GET /api/users/me
+ * @access  Private
+ */
+const getCurrentUser = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "المستخدم غير موجود", success: false });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Get current user error:", error);
+    res.status(500).json({ message: "حدث خطأ أثناء جلب المستخدم", success: false });
   }
 });
 
@@ -584,6 +650,76 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Forgot Password - Generate reset code (don't save in DB)
+// @route   POST /api/users/forgotPassword
+// @access  Public
+const forgotPassword = asyncHandler(async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "لا يوجد حساب مرتبط بهذا البريد الإلكتروني",
+        success: false,
+      });
+    }
+
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    const message = "السلام عليكم، هذا هو رمز إعادة تعيين كلمة المرور الخاص بك";
+    const title = "إعادة تعيين كلمة المرور";
+    await sendMail(email, resetCode, title, message);
+
+    res.status(200).json({
+      success: true,
+      message: "تم إرسال رمز إعادة التعيين إلى بريدك الإلكتروني",
+      code: resetCode, // Send the code back to frontend
+      email: email.toLowerCase(),
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({
+      message: "حدث خطأ أثناء إرسال رمز إعادة التعيين",
+      success: false,
+    });
+  }
+});
+
+// @desc    Reset Password (now combines verification and reset)
+// @route   PUT /api/users/resetPassword
+// @access  Public
+const resetPassword = asyncHandler(async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "المستخدم غير موجود",
+        success: false,
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "تم إعادة تعيين كلمة المرور بنجاح",
+    });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({
+      message: "حدث خطأ أثناء إعادة تعيين كلمة المرور",
+      success: false,
+    });
+  }
+});
+
+
+
 module.exports = {
   register,
   login,
@@ -602,4 +738,8 @@ module.exports = {
   addPackToUsers,
   addFreePackToUser,
   removePackFromUser,
+  getCurrentUser,
+  resetPassword,
+  forgotPassword,
+  logout,
 };

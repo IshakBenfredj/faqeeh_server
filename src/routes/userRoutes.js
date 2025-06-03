@@ -17,6 +17,10 @@ const {
   addPackToUsers,
   removePackFromUser,
   addFreePackToUser,
+  getCurrentUser,
+  forgotPassword,
+  resetPassword,
+  logout,
 } = require("../controllers/userController");
 const { protect, admin } = require("../middleware/authMiddleware");
 
@@ -26,6 +30,9 @@ const router = express.Router();
 router.post("/register", register);
 router.post("/login", login);
 router.post("/confirmEmail", confirmEmail);
+router.post("/forgotPassword", forgotPassword);
+router.post("/resetPassword", resetPassword);
+router.post("/logout",protect, logout);
 
 // User Management Routes
 router.get("/", protect, admin, getUsers);
@@ -44,6 +51,7 @@ router.delete(
 );
 router.get("/withCourse/:courseId", protect, admin, getUsersWithCourse);
 router.get("/withoutCourse/:courseId", protect, admin, getUsersWithoutCourse);
+router.get("/me", protect, getCurrentUser);
 
 // Pack Management Routes
 router.post("/addFreePack", protect, addFreePackToUser);

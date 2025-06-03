@@ -102,7 +102,7 @@ const updateRating = async (req, res) => {
 
     // Check if the rating belongs to the user
     if (rating.user.toString() !== req.user._id.toString()) {
-      res.status(401);
+      res.status(500);
       throw new Error("غير مصرح لك بتحديث هذا التقييم");
     }
 
@@ -132,7 +132,7 @@ const deleteRating = async (req, res) => {
       rating.user.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
     ) {
-      res.status(401);
+      res.status(500);
       throw new Error("غير مصرح لك بحذف هذا التقييم");
     }
 
