@@ -13,6 +13,7 @@ const videosRoutes = require("./routes/videoRoutes");
 const sectionRoutes = require("./routes/sectionRoutes");
 const quizRoutes = require('./routes/quizRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const statisticsRoutes = require('./routes/statisticsRoutes');
 const errorHandler = require("./lib/errorHandler");
 const job = require("./lib/cron");
 
@@ -44,6 +45,7 @@ app.use("/api/videos", videosRoutes);
 app.use("/api/sections", sectionRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 // Error handler
 app.use(errorHandler);

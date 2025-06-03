@@ -7,7 +7,7 @@ const Pack = require("../models/Pack");
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "60s",
+    expiresIn: "15d",
   });
 };
 
