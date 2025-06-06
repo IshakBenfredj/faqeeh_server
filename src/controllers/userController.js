@@ -118,16 +118,22 @@ const login = asyncHandler(async (req, res) => {
 
     let allowLogin = false;
     let newToken = null;
-    if (!user.token) {
+
+    // Allow admin to login from anywhere
+    if (user.role === "admin") {
       allowLogin = true;
     } else {
-      try {
-        jwt.verify(user.token, process.env.JWT_SECRET);
-        // Token is valid and not expired
-        allowLogin = false;
-      } catch (err) {
-        // Token expired or invalid
+      if (!user.token) {
         allowLogin = true;
+      } else {
+        try {
+          jwt.verify(user.token, process.env.JWT_SECRET);
+          // Token is valid and not expired
+          allowLogin = false;
+        } catch (err) {
+          // Token expired or invalid
+          allowLogin = true;
+        }
       }
     }
 
@@ -139,7 +145,6 @@ const login = asyncHandler(async (req, res) => {
     }
 
     newToken = generateToken(user._id);
-    console.log("New token generated:", newToken);
     user.token = newToken;
     await user.save();
 
