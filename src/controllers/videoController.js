@@ -118,6 +118,133 @@ const uploadVideo = asyncHandler(async (req, res) => {
     });
   }
 });
+// @desc    Update a video
+// @route   PUT /api/videos/:id
+// @access  Private/Admin
+const updateVideo = asyncHandler(async (req, res) => {
+  try {
+    const { title, course, description, isFree, videoLink, duration, section } =
+      req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "العنوان مطلوب",
+      });
+    }
+
+    if (!description && !videoLink && !req.file?.path) {
+      return res.status(400).json({
+        success: false,
+        message: "يجب تقديم وصف أو رابط فيديو أو ملف فيديو",
+      });
+    }
+
+    const existingVideo = await Video.findById(req.params.id);
+    if (!existingVideo) {
+      return res
+        .status(404)
+        .json({ success: false, message: "المقطع غير موجود" });
+    }
+
+    let url = existingVideo.video;
+    let durationInSeconds = existingVideo.duration;
+
+    const isR2Video = (videoUrl) => {
+      return videoUrl && videoUrl.startsWith("https:///videos/");
+    };
+
+    if (videoLink) {
+      // Only delete if the new link is different and old video was from R2
+      if (videoLink !== existingVideo.video && isR2Video(existingVideo.video)) {
+        const oldKey = extractIdFromUrl(existingVideo.video);
+        if (oldKey) {
+          try {
+            await deleteFromR2(oldKey);
+          } catch (deleteError) {
+            console.warn(
+              "Failed to delete old video file:",
+              deleteError.message
+            );
+          }
+        }
+      }
+
+      url = videoLink;
+      durationInSeconds = parseInt(duration) || existingVideo.duration;
+    } else if (req.file?.path) {
+      if (isR2Video(existingVideo.video)) {
+        const oldKey = extractIdFromUrl(existingVideo.video);
+        if (oldKey) {
+          try {
+            await deleteFromR2(oldKey);
+          } catch (deleteError) {
+            console.warn(
+              "Failed to delete old video file:",
+              deleteError.message
+            );
+          }
+        }
+      }
+
+      // Upload new file to R2
+      try {
+        durationInSeconds = await getVideoDuration(req.file.path);
+        const key = `videos/${Date.now()}-${req.file.originalname}`;
+        const uploadResult = await uploadToR2(
+          req.file.path,
+          key,
+          req.file.mimetype
+        );
+        url = uploadResult.url; // Should return something like: "/videos/filename.mp4"
+      } catch (uploadError) {
+        // Clean up uploaded file on error
+        if (req.file?.path && fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+        throw uploadError;
+      }
+    }
+
+    // Update the video fields
+    existingVideo.title = title || existingVideo.title;
+    existingVideo.course = course || existingVideo.course;
+    existingVideo.description = description || existingVideo.description;
+    existingVideo.isFree = isFree !== undefined ? isFree : existingVideo.isFree;
+    existingVideo.section =
+      section !== undefined
+        ? section !== ""
+          ? section
+          : null
+        : existingVideo.section;
+    existingVideo.video = url;
+    existingVideo.duration = durationInSeconds;
+
+    const updatedVideo = await existingVideo.save();
+
+    res.json({
+      success: true,
+      message: "تم تحديث الفيديو",
+      data: updatedVideo,
+    });
+  } catch (error) {
+    // Clean up uploaded file on error
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.warn("Failed to cleanup uploaded file:", cleanupError.message);
+      }
+    }
+
+    console.error("Video update error:", error);
+    res.status(500).json({
+      success: false,
+      message: "خطأ في تحديث الفيديو",
+      error: error.message,
+    });
+  }
+});
 
 // Helper function to validate video file
 const validateVideoFile = (file) => {
@@ -184,116 +311,6 @@ const deleteVideo = asyncHandler(async (req, res) => {
     res.status(500).json({
       success: false,
       message: "خطأ في حذف المقطع",
-      error: error.message,
-    });
-    console.log(error);
-  }
-});
-
-// @desc    Update a video
-// @route   PUT /api/videos/:id
-// @access  Private/Admin
-const updateVideo = asyncHandler(async (req, res) => {
-  try {
-    const { title, course, description, isFree, videoLink, duration, section } =
-      req.body;
-
-    const existingVideo = await Video.findById(req.params.id);
-    if (!existingVideo) {
-      return res
-        .status(404)
-        .json({ success: false, message: "المقطع غير موجود" });
-    }
-
-    let url = existingVideo.video;
-    let durationInSeconds = existingVideo.duration;
-
-    if (videoLink) {
-      // If switching to external video link, delete old file if it exists
-      if (existingVideo.video && !existingVideo.video.startsWith("http")) {
-        const oldKey = extractIdFromUrl(existingVideo.video);
-        if (oldKey) {
-          try {
-            await deleteFromR2(oldKey);
-          } catch (deleteError) {
-            console.warn(
-              "Failed to delete old video file:",
-              deleteError.message
-            );
-          }
-        }
-      }
-      url = videoLink;
-      durationInSeconds = parseInt(duration) || existingVideo.duration;
-    } else if (req.file?.path) {
-      // Delete old uploaded file if it exists
-      if (existingVideo.video && !existingVideo.video.startsWith("http")) {
-        const oldKey = extractIdFromUrl(existingVideo.video);
-        if (oldKey) {
-          try {
-            await deleteFromR2(oldKey);
-          } catch (deleteError) {
-            console.warn(
-              "Failed to delete old video file:",
-              deleteError.message
-            );
-          }
-        }
-      }
-
-      // Upload new file
-      try {
-        durationInSeconds = await getVideoDuration(req.file.path);
-        const key = `videos/${Date.now()}-${req.file.originalname}`;
-        const uploadResult = await uploadToR2(
-          req.file.path,
-          key,
-          req.file.mimetype
-        );
-        url = uploadResult.url;
-      } catch (uploadError) {
-        // Clean up uploaded file on error
-        if (req.file?.path && fs.existsSync(req.file.path)) {
-          fs.unlinkSync(req.file.path);
-        }
-        throw uploadError;
-      }
-    }
-
-    // Update video fields
-    existingVideo.title = title || existingVideo.title;
-    existingVideo.course = course || existingVideo.course;
-    existingVideo.description = description || existingVideo.description;
-    existingVideo.isFree = isFree !== undefined ? isFree : existingVideo.isFree;
-    existingVideo.section =
-      section !== undefined
-        ? section !== ""
-          ? section
-          : null
-        : existingVideo.section;
-    existingVideo.video = url;
-    existingVideo.duration = durationInSeconds;
-
-    const updatedVideo = await existingVideo.save();
-
-    res.json({
-      success: true,
-      message: "تم تحديث الفيديو",
-      data: updatedVideo,
-    });
-  } catch (error) {
-    // Clean up any uploaded file on error
-    if (req.file?.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.warn("Failed to cleanup uploaded file:", cleanupError.message);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "خطأ في تحديث الفيديو",
       error: error.message,
     });
     console.log(error);
