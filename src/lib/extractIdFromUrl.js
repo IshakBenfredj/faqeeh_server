@@ -1,6 +1,20 @@
 function extractIdFromUrl(url) {
-  const match = url.match(/\/(?:video|image)\/upload\/v\d+\/(.+?)\.[a-z0-9]+$/i);
-  return match ? match[1] : null;
+  try {
+    url = url.replace(/^https?:\/\/\/*/, "https://");
+    const urlObj = new URL(url);
+    console.log(
+      "key",
+      urlObj.pathname.startsWith("/")
+        ? urlObj.pathname.slice(1)
+        : urlObj.pathname
+    );
+    return urlObj.pathname.startsWith("/")
+      ? urlObj.pathname.slice(1)
+      : urlObj.pathname;
+  } catch (err) {
+    console.error("Invalid URL passed to extractIdFromUrl:", url);
+    return null;
+  }
 }
 
 module.exports = extractIdFromUrl;
