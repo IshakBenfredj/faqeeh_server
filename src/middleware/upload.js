@@ -1,7 +1,7 @@
-const multer = require('multer');
+const multer = require("multer");
 
-
-const upload = multer({ dest: "uploads/" });
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 module.exports = upload;
 
@@ -24,3 +24,16 @@ module.exports = upload;
 // });
 
 // const upload = multer({ storage });
+
+
+
+{/*
+    const multer = require('multer');
+
+
+const upload = multer({ dest: "uploads/" });
+
+module.exports = upload;
+
+
+    */}

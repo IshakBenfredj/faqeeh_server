@@ -11,6 +11,305 @@ const {
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { getVideoDurationInSeconds } = require("get-video-duration");
 const path = require("path");
+const os = require("os");
+
+require("dotenv").config();
+
+const s3Client = new S3({
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
+  region: "auto",
+  credentials: {
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  },
+  maxAttempts: 3,
+});
+
+const ffmpegPath = require("ffmpeg-static");
+const ffprobePath = require("ffprobe-static").path;
+const ffmpeg = require("fluent-ffmpeg");
+
+ffmpeg.setFfmpegPath(ffmpegPath);
+ffmpeg.setFfprobePath(ffprobePath);
+
+async function getVideoDuration(buffer) {
+  const tempPath = path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+  await fs.promises.writeFile(tempPath, buffer);
+
+  try {
+    const duration = await getVideoDurationInSeconds(tempPath);
+    return Math.round(duration);
+  } finally {
+    fs.unlink(tempPath, (err) => {
+      if (err) console.warn("Temp file cleanup failed:", err.message);
+    });
+  }
+}
+
+async function checkIfTranscodingNeeded(file) {
+  return new Promise(async (resolve, reject) => {
+    const isBuffer = Buffer.isBuffer(file);
+    const tempPath = isBuffer 
+      ? path.join(os.tmpdir(), `video-${Date.now()}.mp4`)
+      : file;
+
+    try {
+      if (isBuffer) {
+        await fs.promises.writeFile(tempPath, file);
+      }
+
+      ffmpeg.ffprobe(tempPath, (err, metadata) => {
+        // Clean up if we created a temp file
+        if (isBuffer) {
+          fs.unlink(tempPath, () => {});
+        }
+        
+        if (err) return reject(err);
+
+        const format = metadata.format;
+        const videoStream = metadata.streams.find(s => s.codec_type === "video");
+        const audioStream = metadata.streams.find(s => s.codec_type === "audio");
+
+        const isMp4 = format.format_name.includes("mp4");
+        const isH264 = videoStream?.codec_name === "h264";
+        const isAAC = audioStream?.codec_name === "aac";
+
+        // Only transcode if it's not already mp4+h264+aac
+        resolve(!(isMp4 && isH264 && isAAC));
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function transcodeToMp4(input) {
+  return new Promise(async (resolve, reject) => {
+    const isBuffer = Buffer.isBuffer(input);
+    const inputPath = isBuffer 
+      ? path.join(os.tmpdir(), `video-${Date.now()}.mp4`)
+      : input;
+    const outputPath = path.join(
+      os.tmpdir(), 
+      `video-${Date.now()}-transcoded.mp4`
+    );
+
+    try {
+      if (isBuffer) {
+        await fs.promises.writeFile(inputPath, input);
+      }
+
+      if (!fs.existsSync(inputPath)) {
+        return reject(new Error("Input file does not exist"));
+      }
+
+      ffmpeg(inputPath)
+        .outputOptions(["-c:v libx264", "-preset veryfast", "-crf 23"])
+        .toFormat("mp4")
+        .on("end", () => {
+          // Clean up input if we created it
+          if (isBuffer) {
+            fs.unlink(inputPath, () => {});
+          }
+          resolve(outputPath);
+        })
+        .on("error", (err) => {
+          // Clean up input if we created it
+          if (isBuffer) {
+            fs.unlink(inputPath, () => {});
+          }
+          reject(new Error("Video transcoding failed: " + err.message));
+        })
+        .save(outputPath);
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function uploadToR2(file, key, contentType) {
+  const isBuffer = Buffer.isBuffer(file);
+  let tempPath;
+  let transcodedPath;
+  let pathToUpload;
+
+  try {
+    // Handle buffer input by creating temp file
+    if (isBuffer) {
+      tempPath = path.join(os.tmpdir(), `video-${Date.now()}.mp4`);
+      await fs.promises.writeFile(tempPath, file);
+      pathToUpload = tempPath;
+    } else {
+      pathToUpload = file;
+    }
+
+    // Check if transcoding is needed
+    const needsTranscoding = await checkIfTranscodingNeeded(isBuffer ? file : pathToUpload);
+    if (needsTranscoding) {
+      transcodedPath = await transcodeToMp4(isBuffer ? file : pathToUpload);
+      pathToUpload = transcodedPath;
+    }
+
+    const fileSize = fs.statSync(pathToUpload).size;
+    const maxSingleUploadSize = 100 * 1024 * 1024; // 100MB
+
+    if (fileSize <= maxSingleUploadSize) {
+      const fileContent = fs.readFileSync(pathToUpload);
+      await s3Client.putObject({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        Body: fileContent,
+        ContentType: contentType,
+      });
+    } else {
+      await uploadLargeVideo(pathToUpload, key, contentType);
+    }
+
+    return {
+      key,
+      url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+    };
+  } finally {
+    if (tempPath && fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+    if (transcodedPath && fs.existsSync(transcodedPath)) {
+      fs.unlinkSync(transcodedPath);
+    }
+    if (isBuffer === false && fs.existsSync(file)) {
+      fs.unlinkSync(file); // Clean up original file if it was a path
+    }
+  }
+}
+
+async function uploadLargeVideo(filePath, key, contentType) {
+  const fileSize = fs.statSync(filePath).size;
+  const chunkSize = 100 * 1024 * 1024; // 100MB
+  const concurrency = 3;
+
+  const createMultipartParams = {
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  };
+
+  const { UploadId } = await s3Client.send(
+    new CreateMultipartUploadCommand(createMultipartParams)
+  );
+  const parts = [];
+
+  let partNumber = 1;
+  let position = 0;
+
+  const uploadTasks = [];
+
+  try {
+    while (position < fileSize) {
+      const start = position;
+      const end = Math.min(position + chunkSize, fileSize);
+
+      const partParams = {
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        PartNumber: partNumber,
+        UploadId,
+        Body: fs.createReadStream(filePath, { start, end: end - 1 }),
+      };
+
+      const currentPartNumber = partNumber;
+
+      const uploadTask = s3Client
+        .send(new UploadPartCommand(partParams))
+        .then((result) => ({
+          ETag: result.ETag,
+          PartNumber: currentPartNumber,
+        }));
+
+      uploadTasks.push(uploadTask);
+
+      if (uploadTasks.length === concurrency) {
+        const resolved = await Promise.all(uploadTasks);
+        parts.push(...resolved);
+        uploadTasks.length = 0;
+      }
+
+      position = end;
+      partNumber++;
+    }
+
+    // Final batch
+    if (uploadTasks.length > 0) {
+      const resolved = await Promise.all(uploadTasks);
+      parts.push(...resolved);
+    }
+
+    const completeParams = {
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      UploadId,
+      MultipartUpload: {
+        Parts: parts,
+      },
+    };
+
+    await s3Client.send(new CompleteMultipartUploadCommand(completeParams));
+  } catch (error) {
+    try {
+      await s3Client.send(
+        new AbortMultipartUploadCommand({
+          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Key: key,
+          UploadId,
+        })
+      );
+    } catch (abortErr) {
+      console.error("Failed to abort multipart upload:", abortErr);
+    }
+    throw error;
+  }
+}
+
+const generateSignedUrl = async (key, expiresIn = 11) => {
+  const command = new GetObjectCommand({
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: key,
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn });
+};
+
+const deleteFromR2 = async (key) => {
+  const params = {
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: "videos/" + key,
+  };
+
+  return await s3Client.send(new DeleteObjectCommand(params));
+};
+
+module.exports = {
+  uploadToR2,
+  getVideoDuration,
+  generateSignedUrl,
+  deleteFromR2,
+  uploadLargeVideo,
+};
+
+{/* 
+
+  const fs = require("fs");
+const {
+  S3,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { getVideoDurationInSeconds } = require("get-video-duration");
+const path = require("path");
 
 require("dotenv").config();
 
@@ -273,3 +572,4 @@ module.exports = {
   deleteFromR2,
   uploadLargeVideo,
 };
+   */}
