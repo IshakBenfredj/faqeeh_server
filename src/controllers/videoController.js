@@ -11,7 +11,6 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 
-// Helper function to generate random file names
 const generateRandomFileName = (originalName) => {
   const ext = originalName.split('.').pop();
   return `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${ext}`;
@@ -199,6 +198,7 @@ const updateVideo = asyncHandler(async (req, res) => {
 // @route GET /api/videos/secure-url/:id
 // @access Private/Protected
 const getSecureVideoUrl = asyncHandler(async (req, res) => {
+  console.log('start')
   try {
     const video = await Video.findById(req.params.id).populate("course");
     if (!video || !video.video) {
@@ -217,7 +217,8 @@ const getSecureVideoUrl = asyncHandler(async (req, res) => {
     // Only generate signed URL for R2 videos
     if (video.video.includes("/videos/")) {
       const key = extractIdFromUrl(video.video);
-      const signedUrl = await generateSignedUrl(key, parseInt(video.duration) * 3);
+      console.log('key',key)
+      const signedUrl = await generateSignedUrl(`videos/${key}`, parseInt(video.duration) * 3);
       return res.json({ success: true, url: signedUrl });
     }
 
