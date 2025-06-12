@@ -101,7 +101,8 @@ const uploadVideo = asyncHandler(async (req, res) => {
       data: newVideo,
     });
   } catch (error) {
-    // Clean up any uploaded file on database error
+    console.error("Video upload error:", error);
+
     if (req.file?.path && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
@@ -109,8 +110,6 @@ const uploadVideo = asyncHandler(async (req, res) => {
         console.warn("Failed to cleanup uploaded file:", cleanupError.message);
       }
     }
-
-    console.error("Video upload error:", error);
     res.status(500).json({
       success: false,
       message: "خطأ في رفع المقطع",
@@ -246,39 +245,23 @@ const updateVideo = asyncHandler(async (req, res) => {
   }
 });
 
-// Helper function to validate video file
-const validateVideoFile = (file) => {
-  const allowedMimeTypes = [
-    "video/mp4",
-    "video/mpeg",
-    "video/quicktime",
-    "video/x-msvideo", // .avi
-    "video/x-ms-wmv", // .wmv
-    "video/webm",
-  ];
-
-  const maxSize = 2 * 1024 * 1024 * 1024; // 2GB in bytes
-
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    throw new Error("نوع الملف غير مدعوم. يرجى رفع ملف فيديو صالح");
-  }
-
-  if (file.size > maxSize) {
-    throw new Error("حجم الملف كبير جداً. الحد الأقصى 2GB");
-  }
-
-  return true;
-};
-
 // @route GET /api/videos/secure-url/:id
 // @access Private/Protected
 const getSecureVideoUrl = asyncHandler(async (req, res) => {
-  const video = await Video.findById(req.params.id);
+  const video = await Video.findById(req.params.id).populate("course");
   if (!video || !video.video) {
-    return res.status(404).json();
+    return res.status(404).json({ message: "الفيديو غير موجود" });
   }
 
-  const key = extractIdFromUrl(video.video); // will now return full key with folders and extension
+  const isFree = video.isFree || (video.course && video.course.price === 0);
+
+  if (!isFree && !req.user) {
+    return res
+      .status(500)
+      .json({ message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو" });
+  }
+
+  const key = extractIdFromUrl(video.video);
   const newKey = "videos/" + key;
   const signedUrl = await generateSignedUrl(
     newKey,

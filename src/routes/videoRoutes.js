@@ -17,6 +17,6 @@ router
   .put("/:id", protect, admin, upload.single("video"), updateVideo)
   .put("/:id/:section", protect, admin, updateVideoSection);
 
-router.get("/secure-url/:id", protect, getSecureVideoUrl);
+router.get("/secure-url/:id", getSecureVideoUrl);
 
 module.exports = router;
