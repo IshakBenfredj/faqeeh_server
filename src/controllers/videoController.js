@@ -6,6 +6,7 @@ const {
   getVideoDuration,
   generateSignedUrl,
   deleteFromR2,
+  s3Client,
 } = require("../lib/r2Storage");
 const fs = require("fs");
 const path = require("path");
@@ -14,6 +15,20 @@ const os = require("os");
 const generateRandomFileName = (originalName) => {
   const ext = originalName.split('.').pop();
   return `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${ext}`;
+};
+
+
+const generateUploadUrl = async (req, res) => {
+  const { key, contentType } = req.body;
+
+  const url = await s3Client.getSignedUrlPromise('putObject', {
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+    Expires: 900, 
+  });
+
+  res.json({ url });
 };
 
 // @desc    Upload a new video
