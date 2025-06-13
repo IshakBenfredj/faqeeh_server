@@ -120,8 +120,7 @@ const uploadVideo = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const updateVideo = asyncHandler(async (req, res) => {
   try {
-    const { title, course, description, isFree, videoLink, duration, section } = req.body;
-
+    const { title, course, description, isFree, videoLink, duration } = req.body;
     if (!title) {
       return res.status(400).json({ success: false, message: "العنوان مطلوب" });
     }
@@ -189,7 +188,6 @@ const updateVideo = asyncHandler(async (req, res) => {
     video.course = course || video.course;
     video.description = description?.trim() || video.description;
     video.isFree = isFree !== undefined ? Boolean(isFree) : video.isFree;
-    video.section = section?.trim() || null;
     video.video = url;
     video.duration = durationInSeconds;
 
@@ -263,7 +261,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
     }
 
     // Delete from R2 if it's an R2 video
-    if (video.video.includes("/videos/")) {
+    if (video.video && video.video.includes("/videos/")) {
       const key = extractIdFromUrl(video.video);
       if (key) {
         await deleteFromR2(key).catch(error => {
