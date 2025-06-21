@@ -13,19 +13,18 @@ const path = require("path");
 const os = require("os");
 
 const generateRandomFileName = (originalName) => {
-  const ext = originalName.split('.').pop();
+  const ext = originalName.split(".").pop();
   return `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${ext}`;
 };
-
 
 const generateUploadUrl = async (req, res) => {
   const { key, contentType } = req.body;
 
-  const url = await s3Client.getSignedUrlPromise('putObject', {
+  const url = await s3Client.getSignedUrlPromise("putObject", {
     Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
     Key: key,
     ContentType: contentType,
-    Expires: 900, 
+    Expires: 900,
   });
 
   res.json({ url });
@@ -36,7 +35,8 @@ const generateUploadUrl = async (req, res) => {
 // @access  Private/Admin
 const uploadVideo = asyncHandler(async (req, res) => {
   try {
-    const { title, course, description, isFree, videoLink, duration, section } = req.body;
+    const { title, course, description, isFree, videoLink, duration, section } =
+      req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, message: "العنوان مطلوب" });
@@ -65,7 +65,7 @@ const uploadVideo = asyncHandler(async (req, res) => {
       // Handle file upload
       try {
         // First validate the video file
-        if (!req.file.mimetype.startsWith('video/')) {
+        if (!req.file.mimetype.startsWith("video/")) {
           return res.status(400).json({
             success: false,
             message: "الملف المرفوع ليس ملف فيديو صالح",
@@ -76,8 +76,12 @@ const uploadVideo = asyncHandler(async (req, res) => {
         durationInSeconds = await getVideoDuration(req.file.buffer);
         const fileName = generateRandomFileName(req.file.originalname);
         const key = `videos/${fileName}`;
-        
-        const uploadResult = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+
+        const uploadResult = await uploadToR2(
+          req.file.buffer,
+          key,
+          req.file.mimetype
+        );
         url = uploadResult.url;
       } catch (uploadError) {
         console.error("Upload error:", uploadError);
@@ -120,7 +124,8 @@ const uploadVideo = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const updateVideo = asyncHandler(async (req, res) => {
   try {
-    const { title, course, description, isFree, videoLink, duration } = req.body;
+    const { title, course, description, isFree, videoLink, duration } =
+      req.body;
     if (!title) {
       return res.status(400).json({ success: false, message: "العنوان مطلوب" });
     }
@@ -134,7 +139,9 @@ const updateVideo = asyncHandler(async (req, res) => {
 
     const video = await Video.findById(req.params.id);
     if (!video) {
-      return res.status(404).json({ success: false, message: "المقطع غير موجود" });
+      return res
+        .status(404)
+        .json({ success: false, message: "المقطع غير موجود" });
     }
 
     let url = video.video;
@@ -153,7 +160,7 @@ const updateVideo = asyncHandler(async (req, res) => {
     } else if (req.file?.buffer) {
       // Handle file upload update
       try {
-        if (!req.file.mimetype.startsWith('video/')) {
+        if (!req.file.mimetype.startsWith("video/")) {
           return res.status(400).json({
             success: false,
             message: "الملف المرفوع ليس ملف فيديو صالح",
@@ -170,8 +177,12 @@ const updateVideo = asyncHandler(async (req, res) => {
         durationInSeconds = await getVideoDuration(req.file.buffer);
         const fileName = generateRandomFileName(req.file.originalname);
         const key = `videos/${fileName}`;
-        
-        const uploadResult = await uploadToR2(req.file.buffer, key, req.file.mimetype);
+
+        const uploadResult = await uploadToR2(
+          req.file.buffer,
+          key,
+          req.file.mimetype
+        );
         url = uploadResult.url;
       } catch (uploadError) {
         console.error("Upload error:", uploadError);
@@ -186,12 +197,21 @@ const updateVideo = asyncHandler(async (req, res) => {
     // Update video record
     video.title = title.trim();
     video.course = course || video.course;
-    video.description = description?.trim() || video.description;
-    video.isFree = isFree !== undefined ? Boolean(isFree) : video.isFree;
+    video.description = description?.trim();
+    video.isFree =
+      isFree !== undefined
+        ? isFree === "false"
+          ? false
+          : isFree === "true"
+          ? true
+          : Boolean(isFree)
+        : video.isFree;
     video.video = url;
     video.duration = durationInSeconds;
 
     const updated = await video.save();
+
+    console.log("updated", updated);
 
     res.json({
       success: true,
@@ -211,27 +231,32 @@ const updateVideo = asyncHandler(async (req, res) => {
 // @route GET /api/videos/secure-url/:id
 // @access Private/Protected
 const getSecureVideoUrl = asyncHandler(async (req, res) => {
-  console.log('start')
+  console.log("start");
   try {
     const video = await Video.findById(req.params.id).populate("course");
     if (!video || !video.video) {
-      return res.status(404).json({ success: false, message: "الفيديو غير موجود" });
+      return res
+        .status(404)
+        .json({ success: false, message: "الفيديو غير موجود" });
     }
 
     const isFree = video.isFree || (video.course && video.course.price === 0);
 
     if (!isFree && !req.user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو" 
+        message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو",
       });
     }
 
     // Only generate signed URL for R2 videos
     if (video.video.includes("/videos/")) {
       const key = extractIdFromUrl(video.video);
-      console.log('key',key)
-      const signedUrl = await generateSignedUrl(`videos/${key}`, parseInt(video.duration) * 3);
+      console.log("key", key);
+      const signedUrl = await generateSignedUrl(
+        `videos/${key}`,
+        parseInt(video.duration) * 3
+      );
       return res.json({ success: true, url: signedUrl });
     }
 
@@ -254,9 +279,9 @@ const deleteVideo = asyncHandler(async (req, res) => {
   try {
     const video = await Video.findById(req.params.id);
     if (!video) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "المقطع غير موجود" 
+      return res.status(404).json({
+        success: false,
+        message: "المقطع غير موجود",
       });
     }
 
@@ -264,16 +289,16 @@ const deleteVideo = asyncHandler(async (req, res) => {
     if (video.video && video.video.includes("/videos/")) {
       const key = extractIdFromUrl(video.video);
       if (key) {
-        await deleteFromR2(key).catch(error => {
+        await deleteFromR2(key).catch((error) => {
           console.error("Error deleting from R2:", error);
         });
       }
     }
 
     await video.deleteOne();
-    res.json({ 
-      success: true, 
-      message: "تم حذف المقطع" 
+    res.json({
+      success: true,
+      message: "تم حذف المقطع",
     });
   } catch (error) {
     console.error("Error deleting video:", error);
@@ -292,9 +317,9 @@ const deleteVideo = asyncHandler(async (req, res) => {
 //   try {
 //     const video = await Video.findById(req.params.id);
 //     if (!video) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: "المقطع غير موجود" 
+//       return res.status(404).json({
+//         success: false,
+//         message: "المقطع غير موجود"
 //       });
 //     }
 
@@ -364,8 +389,6 @@ const updateVideoSection = asyncHandler(async (req, res) => {
   }
 });
 
-
-
 module.exports = {
   uploadVideo,
   deleteVideo,
@@ -373,8 +396,6 @@ module.exports = {
   updateVideoSection,
   getSecureVideoUrl,
 };
-
-
 
 {
   /**
