@@ -1041,164 +1041,164 @@ module.exports = {
    */
 }
 
-async function uploadLargeVideo(filePath, key, contentType) {
-  const fileSize = fs.statSync(filePath).size;
-  const minChunkSize = 5 * 1024 * 1024;
-  const maxChunkSize = 50 * 1024 * 1024;
-  let chunkSize = 10 * 1024 * 1024;
-  const concurrency = 2;
-  const maxRetries = 10;
+// async function uploadLargeVideo(filePath, key, contentType) {
+//   const fileSize = fs.statSync(filePath).size;
+//   const minChunkSize = 5 * 1024 * 1024;
+//   const maxChunkSize = 50 * 1024 * 1024;
+//   let chunkSize = 10 * 1024 * 1024;
+//   const concurrency = 2;
+//   const maxRetries = 10;
 
-  const { UploadId } = await s3Client.send(
-    new CreateMultipartUploadCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-      Key: key,
-      ContentType: contentType,
-    })
-  );
+//   const { UploadId } = await s3Client.send(
+//     new CreateMultipartUploadCommand({
+//       Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//       Key: key,
+//       ContentType: contentType,
+//     })
+//   );
 
-  const parts = [];
-  let partNumber = 1;
-  let position = 0;
-  const uploadQueue = [];
+//   const parts = [];
+//   let partNumber = 1;
+//   let position = 0;
+//   const uploadQueue = [];
 
-  // Track failures to adjust chunkSize only on repeated issues
-  let recentFailures = 0;
+//   // Track failures to adjust chunkSize only on repeated issues
+//   let recentFailures = 0;
 
-  const uploadPartWithRetry = async (start, end, partNum) => {
-    let retries = 0;
-    let success = false;
-    let result;
-    let uploadDuration = 0;
+//   const uploadPartWithRetry = async (start, end, partNum) => {
+//     let retries = 0;
+//     let success = false;
+//     let result;
+//     let uploadDuration = 0;
 
-    while (!success && retries < maxRetries) {
-      const tryStart = Date.now();
-      const stream = fs.createReadStream(filePath, { start, end: end - 1 });
+//     while (!success && retries < maxRetries) {
+//       const tryStart = Date.now();
+//       const stream = fs.createReadStream(filePath, { start, end: end - 1 });
 
-      try {
-        result = await s3Client.send(
-          new UploadPartCommand({
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-            Key: key,
-            PartNumber: partNum,
-            UploadId,
-            Body: stream,
-          })
-        );
-        uploadDuration = Date.now() - tryStart;
-        success = true;
-      } catch (err) {
-        retries++;
-        recentFailures++;
+//       try {
+//         result = await s3Client.send(
+//           new UploadPartCommand({
+//             Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//             Key: key,
+//             PartNumber: partNum,
+//             UploadId,
+//             Body: stream,
+//           })
+//         );
+//         uploadDuration = Date.now() - tryStart;
+//         success = true;
+//       } catch (err) {
+//         retries++;
+//         recentFailures++;
 
-        console.warn(
-          `⚠️ فشل رفع الجزء ${partNum} (محاولة ${retries}/${maxRetries}): ${err.message}`
-        );
-        if (err?.$response?.body) {
-          console.error("📄 الاستجابة:", err.$response.body.toString?.());
-        }
+//         console.warn(
+//           `⚠️ فشل رفع الجزء ${partNum} (محاولة ${retries}/${maxRetries}): ${err.message}`
+//         );
+//         if (err?.$response?.body) {
+//           console.error("📄 الاستجابة:", err.$response.body.toString?.());
+//         }
 
-        if (retries === maxRetries) {
-          throw new Error(
-            `❌ فشل رفع الجزء ${partNum} بعد ${maxRetries} محاولات`
-          );
-        }
+//         if (retries === maxRetries) {
+//           throw new Error(
+//             `❌ فشل رفع الجزء ${partNum} بعد ${maxRetries} محاولات`
+//           );
+//         }
 
-        // خفض chunkSize فقط بعد عدة محاولات فاشلة متتالية
-        if (recentFailures >= 3 && chunkSize > minChunkSize) {
-          chunkSize = Math.max(chunkSize / 2, minChunkSize);
-          recentFailures = 0;
-          console.log(
-            `⚠️ خفض chunkSize إلى ${Math.round(
-              chunkSize / 1024 / 1024
-            )}MB بسبب كثرة الفشل`
-          );
-        }
+//         // خفض chunkSize فقط بعد عدة محاولات فاشلة متتالية
+//         if (recentFailures >= 3 && chunkSize > minChunkSize) {
+//           chunkSize = Math.max(chunkSize / 2, minChunkSize);
+//           recentFailures = 0;
+//           console.log(
+//             `⚠️ خفض chunkSize إلى ${Math.round(
+//               chunkSize / 1024 / 1024
+//             )}MB بسبب كثرة الفشل`
+//           );
+//         }
 
-        await new Promise((res) => setTimeout(res, 1000 * retries));
-      }
-    }
+//         await new Promise((res) => setTimeout(res, 1000 * retries));
+//       }
+//     }
 
-    // زيادة chunkSize إذا كانت سرعة الرفع ممتازة
-    if (uploadDuration < 120000 && chunkSize < maxChunkSize) {
-      chunkSize = Math.min(chunkSize * 2, maxChunkSize);
-      console.log(
-        `⚡ رفع سريع — زيادة chunkSize إلى ${Math.round(
-          chunkSize / 1024 / 1024
-        )}MB`
-      );
-    }
+//     // زيادة chunkSize إذا كانت سرعة الرفع ممتازة
+//     if (uploadDuration < 120000 && chunkSize < maxChunkSize) {
+//       chunkSize = Math.min(chunkSize * 2, maxChunkSize);
+//       console.log(
+//         `⚡ رفع سريع — زيادة chunkSize إلى ${Math.round(
+//           chunkSize / 1024 / 1024
+//         )}MB`
+//       );
+//     }
 
-    // تقليل chunk إذا استغرق أكثر من 120 ثانية (بطء مفرط)
-    if (uploadDuration > 180000 && chunkSize > minChunkSize) {
-      chunkSize = Math.max(chunkSize / 2, minChunkSize);
-      console.log(
-        `🐌 رفع بطيء — تقليل chunkSize إلى ${Math.round(
-          chunkSize / 1024 / 1024
-        )}MB`
-      );
-    }
+//     // تقليل chunk إذا استغرق أكثر من 120 ثانية (بطء مفرط)
+//     if (uploadDuration > 180000 && chunkSize > minChunkSize) {
+//       chunkSize = Math.max(chunkSize / 2, minChunkSize);
+//       console.log(
+//         `🐌 رفع بطيء — تقليل chunkSize إلى ${Math.round(
+//           chunkSize / 1024 / 1024
+//         )}MB`
+//       );
+//     }
 
-    console.log(
-      `✅ تم رفع الجزء ${partNum} (${Math.round(
-        (end - start) / 1024 / 1024
-      )}MB) في ${uploadDuration / 1000}s`
-    );
+//     console.log(
+//       `✅ تم رفع الجزء ${partNum} (${Math.round(
+//         (end - start) / 1024 / 1024
+//       )}MB) في ${uploadDuration / 1000}s`
+//     );
 
-    return { ETag: result.ETag, PartNumber: partNum };
-  };
+//     return { ETag: result.ETag, PartNumber: partNum };
+//   };
 
-  try {
-    while (position < fileSize) {
-      const currentChunkSize = Math.min(chunkSize, fileSize - position);
-      const start = position;
-      const end = position + currentChunkSize;
-      const currentPart = partNumber;
+//   try {
+//     while (position < fileSize) {
+//       const currentChunkSize = Math.min(chunkSize, fileSize - position);
+//       const start = position;
+//       const end = position + currentChunkSize;
+//       const currentPart = partNumber;
 
-      uploadQueue.push(uploadPartWithRetry(start, end, currentPart));
+//       uploadQueue.push(uploadPartWithRetry(start, end, currentPart));
 
-      if (uploadQueue.length === concurrency) {
-        const results = await Promise.all(uploadQueue);
-        parts.push(...results);
-        uploadQueue.length = 0;
-      }
+//       if (uploadQueue.length === concurrency) {
+//         const results = await Promise.all(uploadQueue);
+//         parts.push(...results);
+//         uploadQueue.length = 0;
+//       }
 
-      position = end;
-      partNumber++;
-    }
+//       position = end;
+//       partNumber++;
+//     }
 
-    if (uploadQueue.length > 0) {
-      const results = await Promise.all(uploadQueue);
-      parts.push(...results);
-    }
+//     if (uploadQueue.length > 0) {
+//       const results = await Promise.all(uploadQueue);
+//       parts.push(...results);
+//     }
 
-    await s3Client.send(
-      new CompleteMultipartUploadCommand({
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-        Key: key,
-        UploadId,
-        MultipartUpload: { Parts: parts },
-      })
-    );
+//     await s3Client.send(
+//       new CompleteMultipartUploadCommand({
+//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//         Key: key,
+//         UploadId,
+//         MultipartUpload: { Parts: parts },
+//       })
+//     );
 
-    console.log("✅ رفع الفيديو اكتمل بنجاح.");
-  } catch (error) {
-    console.error("❌ حدث خطأ أثناء رفع الفيديو:", error.message);
-    try {
-      await s3Client.send(
-        new AbortMultipartUploadCommand({
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-          Key: key,
-          UploadId,
-        })
-      );
-      console.log("🚫 تم إلغاء عملية الرفع.");
-    } catch (abortErr) {
-      console.error("❗ فشل إلغاء الرفع:", abortErr.message);
-      if (abortErr?.$response?.body) {
-        console.error("📄 الاستجابة:", abortErr.$response.body.toString?.());
-      }
-    }
-    throw error;
-  }
-}
+//     console.log("✅ رفع الفيديو اكتمل بنجاح.");
+//   } catch (error) {
+//     console.error("❌ حدث خطأ أثناء رفع الفيديو:", error.message);
+//     try {
+//       await s3Client.send(
+//         new AbortMultipartUploadCommand({
+//           Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//           Key: key,
+//           UploadId,
+//         })
+//       );
+//       console.log("🚫 تم إلغاء عملية الرفع.");
+//     } catch (abortErr) {
+//       console.error("❗ فشل إلغاء الرفع:", abortErr.message);
+//       if (abortErr?.$response?.body) {
+//         console.error("📄 الاستجابة:", abortErr.$response.body.toString?.());
+//       }
+//     }
+//     throw error;
+//   }
+// }
