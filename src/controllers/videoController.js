@@ -100,7 +100,14 @@ const uploadVideo = asyncHandler(async (req, res) => {
       duration: durationInSeconds,
       course,
       description: description?.trim() || "",
-      isFree: Boolean(isFree),
+      isFree:
+        isFree !== undefined
+          ? isFree === "false"
+            ? false
+            : isFree === "true"
+            ? true
+            : Boolean(isFree)
+          : req.body.isFree,
       section: section?.trim() || null,
     });
 
