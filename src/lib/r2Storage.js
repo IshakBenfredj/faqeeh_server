@@ -17,12 +17,12 @@ const { NodeHttpHandler } = require("@smithy/node-http-handler");
 require("dotenv").config();
 
 const s3Client = new S3({
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
+  endpoint: `https://${'7f6ead12839373560eba49dd39d50ec2'}.eu.r2.cloudflarestorage.com`,
   region: "auto",
   signatureVersion: "v4",
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    accessKeyId: '41c7a5867876b99927f5e22a7615c0e9',
+    secretAccessKey: '456283ce75f6050e296bd58b86b0194e897d4dc88aa29d21cdd61df14c8bd34e',
   },
   requestHandler: new NodeHttpHandler({
     connectionTimeout: 300000, // 5 minutes
@@ -148,7 +148,7 @@ async function uploadToR2(file, key, contentType) {
     if (fileSize <= maxSingleUploadSize) {
       const fileContent = fs.readFileSync(pathToUpload);
       await s3Client.putObject({
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         Body: fileContent,
         ContentType: contentType,
@@ -159,7 +159,7 @@ async function uploadToR2(file, key, contentType) {
 
     return {
       key,
-      url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+      url: `https:///${key}`,
     };
   } finally {
     if (tempPath && fs.existsSync(tempPath)) {
@@ -182,7 +182,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
 
   const { UploadId } = await s3Client.send(
     new CreateMultipartUploadCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: 'faqeeh',
       Key: key,
       ContentType: contentType,
     })
@@ -214,7 +214,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
       try {
         result = await s3Client.send(
           new UploadPartCommand({
-            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+            Bucket: 'faqeeh',
             Key: key,
             PartNumber: partNum,
             UploadId,
@@ -280,7 +280,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
 
     await s3Client.send(
       new CompleteMultipartUploadCommand({
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         UploadId,
         MultipartUpload: { Parts: parts },
@@ -294,7 +294,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
   } catch (error) {
     await s3Client.send(
       new AbortMultipartUploadCommand({
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         UploadId,
       })
@@ -313,7 +313,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
   const maxRetries = 10;
 
   const createMultipartParams = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
     ContentType: contentType,
   };
@@ -335,7 +335,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     while (!success && retries < maxRetries) {
       try {
         const partParams = {
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: 'faqeeh',
           Key: key,
           PartNumber: partNum,
           UploadId,
@@ -397,7 +397,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     }
 
     const completeParams = {
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: 'faqeeh',
       Key: key,
       UploadId,
       MultipartUpload: { Parts: parts },
@@ -410,7 +410,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     try {
       await s3Client.send(
         new AbortMultipartUploadCommand({
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: 'faqeeh',
           Key: key,
           UploadId,
         })
@@ -436,7 +436,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
   const maxRetries = 5;
 
   const createMultipartParams = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
     ContentType: contentType,
   };
@@ -470,7 +470,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
         try {
           result = await s3Client.send(
             new UploadPartCommand({
-              Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+              Bucket: 'faqeeh',
               Key: key,
               PartNumber: partNumber,
               UploadId,
@@ -501,7 +501,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
 
     await s3Client.send(
       new CompleteMultipartUploadCommand({
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         UploadId,
         MultipartUpload: { Parts: parts },
@@ -525,7 +525,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     try {
       await s3Client.send(
         new AbortMultipartUploadCommand({
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: 'faqeeh',
           Key: key,
           UploadId,
         })
@@ -548,7 +548,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
   const concurrency = 2;
 
   const createMultipartParams = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
     ContentType: contentType,
   };
@@ -569,7 +569,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
       const end = Math.min(position + chunkSize, fileSize);
 
       const partParams = {
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         PartNumber: partNumber,
         UploadId,
@@ -604,7 +604,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     }
 
     const completeParams = {
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: 'faqeeh',
       Key: key,
       UploadId,
       MultipartUpload: {
@@ -617,7 +617,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
     try {
       await s3Client.send(
         new AbortMultipartUploadCommand({
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: 'faqeeh',
           Key: key,
           UploadId,
         })
@@ -634,7 +634,7 @@ async function uploadLargeVideo(filePath, key, contentType) {
 }
 const generateSignedUrl = async (key, expiresIn = 11) => {
   const command = new GetObjectCommand({
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
   });
 
@@ -643,7 +643,7 @@ const generateSignedUrl = async (key, expiresIn = 11) => {
 
 const deleteFromR2 = async (key) => {
   const params = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: "videos/" + key,
   };
 
@@ -683,7 +683,7 @@ module.exports = {
 //       // Small upload
 //       const fileContent = fs.readFileSync(pathToUpload);
 //       await s3Client.putObject({
-//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//         Bucket: 'faqeeh',
 //         Key: key,
 //         Body: fileContent,
 //         ContentType: contentType,
@@ -695,7 +695,7 @@ module.exports = {
 
 //     return {
 //       key,
-//       url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`, // permanent public URL
+//       url: `https://${.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`, // permanent public URL
 //     };
 //   } finally {
 //     // Cleanup temp file
@@ -735,7 +735,7 @@ module.exports = {
 //     if (fileSize <= maxSingleUploadSize) {
 //       const fileContent = fs.readFileSync(pathToUpload);
 //       await s3Client.putObject({
-//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//         Bucket: 'faqeeh',
 //         Key: key,
 //         Body: fileContent,
 //         ContentType: contentType,
@@ -746,7 +746,7 @@ module.exports = {
 
 //     return {
 //       key,
-//       url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+//       url: `https://${.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
 //     };
 //   } finally {
 //     if (tempPath && fs.existsSync(tempPath)) {
@@ -780,11 +780,11 @@ const path = require("path");
 require("dotenv").config();
 
 const s3Client = new S3({
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
+  endpoint: `https://${'7f6ead12839373560eba49dd39d50ec2'}.eu.r2.cloudflarestorage.com`,
   region: "auto",
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    accessKeyId: '41c7a5867876b99927f5e22a7615c0e9',
+    secretAccessKey: '456283ce75f6050e296bd58b86b0194e897d4dc88aa29d21cdd61df14c8bd34e',
   },
   maxAttempts: 3,
 });
@@ -860,7 +860,7 @@ const uploadToR2 = async (filePath, key, contentType) => {
       const fileContent = fs.readFileSync(pathToUpload);
 
       const params = {
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         Body: fileContent,
         ContentType: contentType,
@@ -879,7 +879,7 @@ const uploadToR2 = async (filePath, key, contentType) => {
 
     return {
       key,
-      url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+      url: `https://${.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
     };
   } catch (error) {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -899,7 +899,7 @@ const uploadToR2 = async (filePath, key, contentType) => {
 //       const fileContent = fs.readFileSync(filePath);
 
 //       const params = {
-//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//         Bucket: 'faqeeh',
 //         Key: key,
 //         Body: fileContent,
 //         ContentType: contentType,
@@ -916,7 +916,7 @@ const uploadToR2 = async (filePath, key, contentType) => {
 
 //     return {
 //       key,
-//       url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+//       url: `https://${.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
 //     };
 //   } catch (error) {
 //     if (fs.existsSync(filePath)) {
@@ -932,7 +932,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
   const concurrency = 3;
 
   const createMultipartParams = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
     ContentType: contentType,
   };
@@ -953,7 +953,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
       const end = Math.min(position + chunkSize, fileSize);
 
       const partParams = {
-        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Bucket: 'faqeeh',
         Key: key,
         PartNumber: partNumber,
         UploadId,
@@ -988,7 +988,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
     }
 
     const completeParams = {
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: 'faqeeh',
       Key: key,
       UploadId,
       MultipartUpload: {
@@ -1001,7 +1001,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
     try {
       await s3Client.send(
         new AbortMultipartUploadCommand({
-          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Bucket: 'faqeeh',
           Key: key,
           UploadId,
         })
@@ -1015,7 +1015,7 @@ const uploadLargeVideo = async (filePath, key, contentType) => {
 
 const generateSignedUrl = async (key, expiresIn = 11) => {
   const command = new GetObjectCommand({
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
   });
 
@@ -1024,7 +1024,7 @@ const generateSignedUrl = async (key, expiresIn = 11) => {
 
 const deleteFromR2 = async (key) => {
   const params = {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: "videos/" + key,
   };
 
@@ -1051,7 +1051,7 @@ module.exports = {
 
 //   const { UploadId } = await s3Client.send(
 //     new CreateMultipartUploadCommand({
-//       Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//       Bucket: 'faqeeh',
 //       Key: key,
 //       ContentType: contentType,
 //     })
@@ -1078,7 +1078,7 @@ module.exports = {
 //       try {
 //         result = await s3Client.send(
 //           new UploadPartCommand({
-//             Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//             Bucket: 'faqeeh',
 //             Key: key,
 //             PartNumber: partNum,
 //             UploadId,
@@ -1174,7 +1174,7 @@ module.exports = {
 
 //     await s3Client.send(
 //       new CompleteMultipartUploadCommand({
-//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//         Bucket: 'faqeeh',
 //         Key: key,
 //         UploadId,
 //         MultipartUpload: { Parts: parts },
@@ -1187,7 +1187,7 @@ module.exports = {
 //     try {
 //       await s3Client.send(
 //         new AbortMultipartUploadCommand({
-//           Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+//           Bucket: 'faqeeh',
 //           Key: key,
 //           UploadId,
 //         })

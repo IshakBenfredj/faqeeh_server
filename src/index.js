@@ -21,7 +21,7 @@ const job = require("./lib/cron");
 dotenv.config();
 
 const app = express();
-job.start();
+// job.start();
 
 // Middleware
 app.use(cors());
@@ -36,7 +36,7 @@ app.use(express.raw({
 
 // Database connection
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect('mongodb+srv://faqeehacademy:BxW0dr9nKwUf9iVs@cluster0.dom9jvn.mongodb.net/faqeeh?retryWrites=true&w=majority&appName=Cluster0')
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
@@ -62,7 +62,7 @@ app.use('/api/uploads', uploadsRoutes);
 // Error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

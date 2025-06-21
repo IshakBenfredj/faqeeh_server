@@ -4,9 +4,9 @@ const cloudinary = require("cloudinary").v2;
 require("dotenv").config();
 
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: 'divbldppz',
+  api_key: '938211877471192',
+  api_secret: 'wgmNSKBo0umj3MK7Mjla8FnWsHY',
 });
 
 const uploadImageToCloudinary = async (filePath) => {
@@ -35,13 +35,13 @@ const generateSignedVideoUrl = (publicId, expiresInSeconds = 3) => {
       public_id: publicId,
       timestamp: timestamp,
     },
-    process.env.CLOUDINARY_API_SECRET
+    'wgmNSKBo0umj3MK7Mjla8FnWsHY'
   );
 
   const url =
-    `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload` +
+    `https://res.cloudinary.com/divbldppz/video/upload` +
     `/v${timestamp}/${publicId}.mp4` +
-    `?timestamp=${timestamp}&signature=${signature}&api_key=${process.env.CLOUDINARY_API_KEY}`;
+    `?timestamp=${timestamp}&signature=${signature}&api_key=938211877471192`;
 
   return url;
 };

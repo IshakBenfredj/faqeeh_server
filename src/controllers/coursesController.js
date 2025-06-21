@@ -24,7 +24,7 @@ const getCourses = asyncHandler(async (req, res) => {
     if (authHeader && authHeader.startsWith("Bearer")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, 'ee766e44f5e2c5bc3b225ff2926bb2b949a1f42a86c191be4b5a8bc73dfe844c');
         user = await User.findById(decoded.id).select("-password");
       } catch (err) {
         console.warn("Invalid token, proceeding as guest.");
@@ -122,7 +122,7 @@ const getCourse = asyncHandler(async (req, res) => {
     if (authHeader && authHeader.startsWith("Bearer")) {
       try {
         const token = authHeader.split(" ")[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, 'ee766e44f5e2c5bc3b225ff2926bb2b949a1f42a86c191be4b5a8bc73dfe844c');
         user = await User.findById(decoded.id).select("-password");
       } catch (err) {
         console.warn("Invalid token, proceeding as guest.");

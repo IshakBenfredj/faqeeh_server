@@ -9,10 +9,10 @@ require('dotenv').config()
 
 const s3 = new S3({
   region: "auto",
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
+  endpoint: `https://${'7f6ead12839373560eba49dd39d50ec2'}.eu.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    accessKeyId: '41c7a5867876b99927f5e22a7615c0e9',
+    secretAccessKey: '456283ce75f6050e296bd58b86b0194e897d4dc88aa29d21cdd61df14c8bd34e',
   },
 });
 
@@ -21,7 +21,7 @@ router.post("/get-upload-url", async (req, res) => {
     const key = `videos/${uuidv4()}.mp4`;
 
     const command = new PutObjectCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: 'faqeeh',
       Key: key,
       ContentType: "video/mp4",
     });

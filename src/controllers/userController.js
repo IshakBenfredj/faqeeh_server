@@ -6,7 +6,7 @@ const Course = require("../models/Course");
 const Pack = require("../models/Pack");
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+  return jwt.sign({ id }, 'ee766e44f5e2c5bc3b225ff2926bb2b949a1f42a86c191be4b5a8bc73dfe844c', {
     expiresIn: "15d",
   });
 };
@@ -127,7 +127,7 @@ const login = asyncHandler(async (req, res) => {
         allowLogin = true;
       } else {
         try {
-          jwt.verify(user.token, process.env.JWT_SECRET);
+          jwt.verify(user.token, 'ee766e44f5e2c5bc3b225ff2926bb2b949a1f42a86c191be4b5a8bc73dfe844c');
           // Token is valid and not expired
           allowLogin = false;
         } catch (err) {

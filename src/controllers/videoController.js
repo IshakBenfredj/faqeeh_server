@@ -21,7 +21,7 @@ const generateUploadUrl = async (req, res) => {
   const { key, contentType } = req.body;
 
   const url = await s3Client.getSignedUrlPromise("putObject", {
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: 'faqeeh',
     Key: key,
     ContentType: contentType,
     Expires: 900,
@@ -249,12 +249,12 @@ const getSecureVideoUrl = asyncHandler(async (req, res) => {
 
     const isFree = video.isFree || (video.course && video.course.price === 0);
 
-    if (!isFree && !req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو",
-      });
-    }
+    // if (!isFree && !req.user) {
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو",
+    //   });
+    // }
 
     // Only generate signed URL for R2 videos
     if (video.video.includes("/videos/")) {

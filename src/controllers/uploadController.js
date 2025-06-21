@@ -8,10 +8,10 @@ const { v4: uuidv4 } = require("uuid");
 
 const s3Client = new S3({
   region: "auto",
-  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
+  endpoint: `https://${'7f6ead12839373560eba49dd39d50ec2'}.eu.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID,
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+    accessKeyId: '41c7a5867876b99927f5e22a7615c0e9',
+    secretAccessKey: '456283ce75f6050e296bd58b86b0194e897d4dc88aa29d21cdd61df14c8bd34e',
   },
 });
 
@@ -19,7 +19,7 @@ exports.initiateUpload = async (req, res) => {
   const key = `videos/${uuidv4()}.mp4`;
 
   const command = new CreateMultipartUploadCommand({
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: .CLOUDFLARE_R2_BUCKET_NAME,
     Key: key,
     ContentType: "video/mp4",
   });
@@ -34,7 +34,7 @@ exports.uploadPart = async (req, res) => {
     const buffer = req.body;
 
     const command = new UploadPartCommand({
-      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: .CLOUDFLARE_R2_BUCKET_NAME,
       Key: key,
       UploadId: uploadId,
       PartNumber: parseInt(partNumber),
@@ -60,7 +60,7 @@ exports.completeUpload = async (req, res) => {
   const { key, uploadId, parts } = req.body;
 
   const command = new CompleteMultipartUploadCommand({
-    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Bucket: .CLOUDFLARE_R2_BUCKET_NAME,
     Key: key,
     UploadId: uploadId,
     MultipartUpload: { Parts: parts },
@@ -70,7 +70,7 @@ exports.completeUpload = async (req, res) => {
     await s3Client.send(command);
     res.json({
       message: "Upload complete",
-      url: `https://${process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
+      url: `https://${.CLOUDFLARE_R2_PUBLIC_DOMAIN}/${key}`,
     });
   } catch (err) {
     console.error("completeUpload error:", err);

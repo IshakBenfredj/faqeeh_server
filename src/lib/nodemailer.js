@@ -5,15 +5,15 @@ dotenv.config();
 const transporter = nodemailer.createTransport({
   service: "Gmail",
   auth: {
-    user: process.env.MAIL,
-    pass: process.env.MAIL_PASSWORD,
+    user: 'faqeehacademy@gmail.com',
+    pass: 'zhhb uumc ucxr vbud',
   },
 });
 
 const sendMail = (email, code, title, message) => {
   transporter.sendMail(
     {
-      from: process.env.MAIL,
+      from: 'faqeehacademy@gmail.com',
       to: email,
       subject: title,
       html: `
@@ -52,7 +52,7 @@ const sendMailFromUserToTeam = (message) => {
   transporter.sendMail(
     {
       from: message.email,
-      to: process.env.MAIL,
+      to: 'faqeehacademy@gmail.com',
       subject: `رسالة من ${message.name}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; border-radius: 10px; direction: rtl;">
