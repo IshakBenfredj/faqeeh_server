@@ -14,6 +14,7 @@ const sectionRoutes = require("./routes/sectionRoutes");
 const quizRoutes = require('./routes/quizRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const statisticsRoutes = require('./routes/statisticsRoutes');
+const uploadsRoutes = require('./routes/uploadRoutes');
 const errorHandler = require("./lib/errorHandler");
 const job = require("./lib/cron");
 
@@ -50,6 +51,13 @@ app.use("/api/sections", sectionRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/statistics', statisticsRoutes);
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/uploads/upload-part")) {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+app.use('/api/uploads', uploadsRoutes);
 
 // Error handler
 app.use(errorHandler);

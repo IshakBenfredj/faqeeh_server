@@ -170,13 +170,270 @@ async function uploadToR2(file, key, contentType) {
     }
   }
 }
+{
+  /*
+const uploadLargeVideo = async (filePath, key, contentType) => {
+  const fileSize = fs.statSync(filePath).size;
+  const minChunkSize = 5 * 1024 * 1024; // R2 لا يقبل أقل من 5MB إلا في الجزء الأخير
+  const maxChunkSize = 50 * 1024 * 1024;
+  let chunkSize = 10 * 1024 * 1024;
+  const concurrency = 2;
+  const maxRetries = 5;
 
+  const { UploadId } = await s3Client.send(
+    new CreateMultipartUploadCommand({
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+    })
+  );
+
+  const parts = [];
+  const startTime = Date.now();
+  let partNumber = 1;
+  let position = 0;
+
+  console.log(
+    `🚀 بدء رفع الفيديو: ${filePath} (${Math.round(fileSize / 1024 / 1024)} MB)`
+  );
+
+  const uploadQueue = [];
+
+  const uploadPart = async (start, end, partNum) => {
+    const actualChunkSize = end - start;
+    const partRange = `[${start} - ${end}]`;
+    let retries = 0;
+    let success = false;
+    let result;
+    let uploadDuration = 0;
+
+    while (!success && retries < maxRetries) {
+      const tryStart = Date.now();
+      const stream = fs.createReadStream(filePath, { start, end: end - 1 });
+
+      try {
+        result = await s3Client.send(
+          new UploadPartCommand({
+            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+            Key: key,
+            PartNumber: partNum,
+            UploadId,
+            Body: stream,
+          })
+        );
+        uploadDuration = Date.now() - tryStart;
+        success = true;
+      } catch (err) {
+        retries++;
+        console.warn(
+          `⚠️ فشل رفع الجزء ${partNum} ${partRange} (محاولة ${retries}/${maxRetries}): ${err.message}`
+        );
+        if (retries === maxRetries)
+          throw new Error(`❌ فشل الجزء ${partNum} بعد ${maxRetries} محاولات`);
+        await new Promise((res) => setTimeout(res, 1000 * retries));
+      }
+    }
+
+    // تعديل حجم chunk حسب السرعة:
+    if (uploadDuration < 3000 && chunkSize < maxChunkSize) {
+      chunkSize = Math.min(chunkSize * 2, maxChunkSize);
+    } else if (uploadDuration > 10000 && chunkSize > minChunkSize) {
+      chunkSize = Math.max(chunkSize / 2, minChunkSize);
+    }
+
+    console.log(
+      `📤 تم رفع الجزء ${partNum} (${Math.round(
+        actualChunkSize / 1024 / 1024
+      )} MB) في ${uploadDuration / 1000}s`
+    );
+    return { ETag: result.ETag, PartNumber: partNum };
+  };
+
+  try {
+    while (position < fileSize) {
+      const currentChunkSize = Math.min(chunkSize, fileSize - position);
+      const isLastPart = position + currentChunkSize >= fileSize;
+
+      if (!isLastPart && currentChunkSize < minChunkSize) {
+        chunkSize = minChunkSize;
+      }
+
+      const start = position;
+      const end = Math.min(position + chunkSize, fileSize);
+
+      uploadQueue.push(uploadPart(start, end, partNumber));
+
+      if (uploadQueue.length === concurrency) {
+        const results = await Promise.all(uploadQueue);
+        parts.push(...results);
+        uploadQueue.length = 0;
+      }
+
+      position = end;
+      partNumber++;
+    }
+
+    if (uploadQueue.length > 0) {
+      const results = await Promise.all(uploadQueue);
+      parts.push(...results);
+    }
+
+    await s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        UploadId,
+        MultipartUpload: { Parts: parts },
+      })
+    );
+
+    const totalTime = Date.now() - startTime;
+    const minutes = Math.floor(totalTime / 60000);
+    const seconds = Math.floor((totalTime % 60000) / 1000);
+    console.log(`✅ اكتمل رفع الفيديو في ${minutes} دقيقة و ${seconds} ثانية`);
+  } catch (error) {
+    await s3Client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        UploadId,
+      })
+    );
+    console.log("🔁 تم إلغاء الرفع.");
+    throw error;
+  }
+};
+  */
+}
+
+async function uploadLargeVideo(filePath, key, contentType) {
+  const fileSize = fs.statSync(filePath).size;
+  const chunkSize = 50 * 1024 * 1024; // 50MB
+  const concurrency = 2;
+  const maxRetries = 10;
+
+  const createMultipartParams = {
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  };
+
+  const { UploadId } = await s3Client.send(
+    new CreateMultipartUploadCommand(createMultipartParams)
+  );
+
+  const parts = [];
+  let partNumber = 1;
+  let position = 0;
+  const uploadQueue = [];
+
+  const uploadPartWithRetry = async (start, end, partNum) => {
+    let retries = 0;
+    let success = false;
+    let result;
+
+    while (!success && retries < maxRetries) {
+      try {
+        const partParams = {
+          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Key: key,
+          PartNumber: partNum,
+          UploadId,
+          Body: fs.createReadStream(filePath, { start, end: end - 1 }),
+        };
+
+        result = await s3Client.send(new UploadPartCommand(partParams));
+        success = true;
+
+        console.log(
+          `✅ تم رفع الجزء ${partNum} (${Math.round(
+            (end - start) / 1024 / 1024
+          )}MB)`
+        );
+        return { ETag: result.ETag, PartNumber: partNum };
+      } catch (err) {
+        retries++;
+        const delay = 1000 * retries;
+        console.warn(
+          `⚠️ فشل رفع الجزء ${partNum} (محاولة ${retries}/${maxRetries}): ${err.message}`
+        );
+        if (err?.$response?.body) {
+          console.error("📄 الاستجابة:", err.$response.body.toString?.());
+        }
+
+        if (retries === maxRetries) {
+          throw new Error(
+            `❌ فشل رفع الجزء ${partNum} بعد ${maxRetries} محاولات`
+          );
+        }
+
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
+  };
+
+  try {
+    while (position < fileSize) {
+      const start = position;
+      const end = Math.min(position + chunkSize, fileSize);
+      const currentPart = partNumber;
+
+      const task = uploadPartWithRetry(start, end, currentPart);
+      uploadQueue.push(task);
+
+      if (uploadQueue.length === concurrency) {
+        const results = await Promise.all(uploadQueue);
+        parts.push(...results);
+        uploadQueue.length = 0;
+      }
+
+      position = end;
+      partNumber++;
+    }
+
+    if (uploadQueue.length > 0) {
+      const results = await Promise.all(uploadQueue);
+      parts.push(...results);
+    }
+
+    const completeParams = {
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      UploadId,
+      MultipartUpload: { Parts: parts },
+    };
+
+    await s3Client.send(new CompleteMultipartUploadCommand(completeParams));
+    console.log("✅ رفع الفيديو اكتمل بنجاح.");
+  } catch (error) {
+    console.error("❌ حدث خطأ أثناء رفع الفيديو:", error.message);
+    try {
+      await s3Client.send(
+        new AbortMultipartUploadCommand({
+          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Key: key,
+          UploadId,
+        })
+      );
+      console.log("🚫 تم إلغاء عملية الرفع.");
+    } catch (abortErr) {
+      console.error("❗ فشل إلغاء الرفع:", abortErr.message);
+      if (abortErr?.$response?.body) {
+        console.error("📄 الاستجابة:", abortErr.$response.body.toString?.());
+      }
+    }
+    throw error;
+  }
+}
+
+{
+  /**
 async function uploadLargeVideo(filePath, key, contentType) {
   const startTime = Date.now(); // 🕒 البداية
 
   const fileSize = fs.statSync(filePath).size;
   const chunkSize = 10 * 1024 * 1024; // 10MB
-  const maxRetries = 3;
+  const maxRetries = 5;
 
   const createMultipartParams = {
     Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
@@ -192,7 +449,9 @@ async function uploadLargeVideo(filePath, key, contentType) {
   let partNumber = 1;
   let position = 0;
 
-  console.log(`🚀 بدء رفع الفيديو: ${filePath} (${Math.round(fileSize / 1024 / 1024)} MB)`);
+  console.log(
+    `🚀 بدء رفع الفيديو: ${filePath} (${Math.round(fileSize / 1024 / 1024)} MB)`
+  );
 
   try {
     while (position < fileSize) {
@@ -204,10 +463,9 @@ async function uploadLargeVideo(filePath, key, contentType) {
       let success = false;
       let result;
 
-      const stream = fs.createReadStream(filePath, { start, end: end - 1 });
-
       console.log(`📤 رفع الجزء ${partNumber} ${partRange}`);
 
+        const stream = fs.createReadStream(filePath, { start, end: end - 1 });
       while (!success && retries < maxRetries) {
         try {
           result = await s3Client.send(
@@ -222,8 +480,13 @@ async function uploadLargeVideo(filePath, key, contentType) {
           success = true;
         } catch (err) {
           retries++;
-          console.warn(`⚠️ فشل رفع الجزء ${partNumber} (محاولة ${retries}/${maxRetries}): ${err.message}`);
-          if (retries === maxRetries) throw new Error(`❌ فشل الجزء ${partNumber} بعد ${maxRetries} محاولات`);
+          console.warn(
+            `⚠️ فشل رفع الجزء ${partNumber} (محاولة ${retries}/${maxRetries}): ${err.message}`
+          );
+          if (retries === maxRetries)
+            throw new Error(
+              `❌ فشل الجزء ${partNumber} بعد ${maxRetries} محاولات`
+            );
         }
       }
 
@@ -255,7 +518,9 @@ async function uploadLargeVideo(filePath, key, contentType) {
     const minutes = Math.floor(durationMs / 60000);
     const seconds = Math.floor((durationMs % 60000) / 1000);
 
-    console.error(`⛔️ فشل رفع الفيديو بعد ${minutes} دقيقة و ${seconds} ثانية: ${error.message}`);
+    console.error(
+      `⛔️ فشل رفع الفيديو بعد ${minutes} دقيقة و ${seconds} ثانية: ${error.message}`
+    );
 
     try {
       await s3Client.send(
@@ -273,97 +538,100 @@ async function uploadLargeVideo(filePath, key, contentType) {
     throw error;
   }
 }
+*/
+}
+{
+  /*
+async function uploadLargeVideo(filePath, key, contentType) {
+  const fileSize = fs.statSync(filePath).size;
+  const chunkSize = 50 * 1024 * 1024; // 50MB
+  const concurrency = 2;
 
+  const createMultipartParams = {
+    Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+    Key: key,
+    ContentType: contentType,
+  };
 
-// async function uploadLargeVideo(filePath, key, contentType) {
-//   const fileSize = fs.statSync(filePath).size;
-//   const chunkSize = 50 * 1024 * 1024; // 50MB
-//   const concurrency = 2;
+  const { UploadId } = await s3Client.send(
+    new CreateMultipartUploadCommand(createMultipartParams)
+  );
+  const parts = [];
 
-//   const createMultipartParams = {
-//     Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-//     Key: key,
-//     ContentType: contentType,
-//   };
+  let partNumber = 1;
+  let position = 0;
 
-//   const { UploadId } = await s3Client.send(
-//     new CreateMultipartUploadCommand(createMultipartParams)
-//   );
-//   const parts = [];
+  const uploadTasks = [];
 
-//   let partNumber = 1;
-//   let position = 0;
+  try {
+    while (position < fileSize) {
+      const start = position;
+      const end = Math.min(position + chunkSize, fileSize);
 
-//   const uploadTasks = [];
+      const partParams = {
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        PartNumber: partNumber,
+        UploadId,
+        Body: fs.createReadStream(filePath, { start, end: end - 1 }),
+      };
 
-//   try {
-//     while (position < fileSize) {
-//       const start = position;
-//       const end = Math.min(position + chunkSize, fileSize);
+      const currentPartNumber = partNumber;
 
-//       const partParams = {
-//         Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-//         Key: key,
-//         PartNumber: partNumber,
-//         UploadId,
-//         Body: fs.createReadStream(filePath, { start, end: end - 1 }),
-//       };
+      const uploadTask = s3Client
+        .send(new UploadPartCommand(partParams))
+        .then((result) => ({
+          ETag: result.ETag,
+          PartNumber: currentPartNumber,
+        }));
 
-//       const currentPartNumber = partNumber;
+      uploadTasks.push(uploadTask);
 
-//       const uploadTask = s3Client
-//         .send(new UploadPartCommand(partParams))
-//         .then((result) => ({
-//           ETag: result.ETag,
-//           PartNumber: currentPartNumber,
-//         }));
+      if (uploadTasks.length === concurrency) {
+        const resolved = await Promise.all(uploadTasks);
+        parts.push(...resolved);
+        uploadTasks.length = 0;
+      }
 
-//       uploadTasks.push(uploadTask);
+      position = end;
+      partNumber++;
+    }
 
-//       if (uploadTasks.length === concurrency) {
-//         const resolved = await Promise.all(uploadTasks);
-//         parts.push(...resolved);
-//         uploadTasks.length = 0;
-//       }
+    // Final batch
+    if (uploadTasks.length > 0) {
+      const resolved = await Promise.all(uploadTasks);
+      parts.push(...resolved);
+    }
 
-//       position = end;
-//       partNumber++;
-//     }
+    const completeParams = {
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      UploadId,
+      MultipartUpload: {
+        Parts: parts,
+      },
+    };
 
-//     // Final batch
-//     if (uploadTasks.length > 0) {
-//       const resolved = await Promise.all(uploadTasks);
-//       parts.push(...resolved);
-//     }
-
-//     const completeParams = {
-//       Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-//       Key: key,
-//       UploadId,
-//       MultipartUpload: {
-//         Parts: parts,
-//       },
-//     };
-
-//     await s3Client.send(new CompleteMultipartUploadCommand(completeParams));
-//   } catch (error) {
-//     try {
-//       await s3Client.send(
-//         new AbortMultipartUploadCommand({
-//           Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
-//           Key: key,
-//           UploadId,
-//         })
-//       );
-//     } catch (abortErr) {
-//       console.error("Raw response body:", abortErr?.$response?.body);
-//       throw abortErr;
-//       console.error("Failed to abort multipart upload:", abortErr);
-//     }
-//     throw error;
-//   }
-// }
-
+    await s3Client.send(new CompleteMultipartUploadCommand(completeParams));
+  } catch (error) {
+    try {
+      await s3Client.send(
+        new AbortMultipartUploadCommand({
+          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Key: key,
+          UploadId,
+        })
+      );
+    } catch (abortErr) {
+      console.error("Raw response body:", abortErr?.$response?.body);
+      throw abortErr;
+      console.error("Failed to abort multipart upload:", abortErr);
+    }
+    throw error;
+  }
+}
+*/
+}
 const generateSignedUrl = async (key, expiresIn = 11) => {
   const command = new GetObjectCommand({
     Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
@@ -495,7 +763,6 @@ module.exports = {
 
 {
   /* 
-
   const fs = require("fs");
 const {
   S3,
@@ -772,4 +1039,166 @@ module.exports = {
   uploadLargeVideo,
 };
    */
+}
+
+async function uploadLargeVideo(filePath, key, contentType) {
+  const fileSize = fs.statSync(filePath).size;
+  const minChunkSize = 5 * 1024 * 1024;
+  const maxChunkSize = 50 * 1024 * 1024;
+  let chunkSize = 10 * 1024 * 1024;
+  const concurrency = 2;
+  const maxRetries = 10;
+
+  const { UploadId } = await s3Client.send(
+    new CreateMultipartUploadCommand({
+      Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+    })
+  );
+
+  const parts = [];
+  let partNumber = 1;
+  let position = 0;
+  const uploadQueue = [];
+
+  // Track failures to adjust chunkSize only on repeated issues
+  let recentFailures = 0;
+
+  const uploadPartWithRetry = async (start, end, partNum) => {
+    let retries = 0;
+    let success = false;
+    let result;
+    let uploadDuration = 0;
+
+    while (!success && retries < maxRetries) {
+      const tryStart = Date.now();
+      const stream = fs.createReadStream(filePath, { start, end: end - 1 });
+
+      try {
+        result = await s3Client.send(
+          new UploadPartCommand({
+            Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+            Key: key,
+            PartNumber: partNum,
+            UploadId,
+            Body: stream,
+          })
+        );
+        uploadDuration = Date.now() - tryStart;
+        success = true;
+      } catch (err) {
+        retries++;
+        recentFailures++;
+
+        console.warn(
+          `⚠️ فشل رفع الجزء ${partNum} (محاولة ${retries}/${maxRetries}): ${err.message}`
+        );
+        if (err?.$response?.body) {
+          console.error("📄 الاستجابة:", err.$response.body.toString?.());
+        }
+
+        if (retries === maxRetries) {
+          throw new Error(
+            `❌ فشل رفع الجزء ${partNum} بعد ${maxRetries} محاولات`
+          );
+        }
+
+        // خفض chunkSize فقط بعد عدة محاولات فاشلة متتالية
+        if (recentFailures >= 3 && chunkSize > minChunkSize) {
+          chunkSize = Math.max(chunkSize / 2, minChunkSize);
+          recentFailures = 0;
+          console.log(
+            `⚠️ خفض chunkSize إلى ${Math.round(
+              chunkSize / 1024 / 1024
+            )}MB بسبب كثرة الفشل`
+          );
+        }
+
+        await new Promise((res) => setTimeout(res, 1000 * retries));
+      }
+    }
+
+    // زيادة chunkSize إذا كانت سرعة الرفع ممتازة
+    if (uploadDuration < 120000 && chunkSize < maxChunkSize) {
+      chunkSize = Math.min(chunkSize * 2, maxChunkSize);
+      console.log(
+        `⚡ رفع سريع — زيادة chunkSize إلى ${Math.round(
+          chunkSize / 1024 / 1024
+        )}MB`
+      );
+    }
+
+    // تقليل chunk إذا استغرق أكثر من 120 ثانية (بطء مفرط)
+    if (uploadDuration > 180000 && chunkSize > minChunkSize) {
+      chunkSize = Math.max(chunkSize / 2, minChunkSize);
+      console.log(
+        `🐌 رفع بطيء — تقليل chunkSize إلى ${Math.round(
+          chunkSize / 1024 / 1024
+        )}MB`
+      );
+    }
+
+    console.log(
+      `✅ تم رفع الجزء ${partNum} (${Math.round(
+        (end - start) / 1024 / 1024
+      )}MB) في ${uploadDuration / 1000}s`
+    );
+
+    return { ETag: result.ETag, PartNumber: partNum };
+  };
+
+  try {
+    while (position < fileSize) {
+      const currentChunkSize = Math.min(chunkSize, fileSize - position);
+      const start = position;
+      const end = position + currentChunkSize;
+      const currentPart = partNumber;
+
+      uploadQueue.push(uploadPartWithRetry(start, end, currentPart));
+
+      if (uploadQueue.length === concurrency) {
+        const results = await Promise.all(uploadQueue);
+        parts.push(...results);
+        uploadQueue.length = 0;
+      }
+
+      position = end;
+      partNumber++;
+    }
+
+    if (uploadQueue.length > 0) {
+      const results = await Promise.all(uploadQueue);
+      parts.push(...results);
+    }
+
+    await s3Client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+        Key: key,
+        UploadId,
+        MultipartUpload: { Parts: parts },
+      })
+    );
+
+    console.log("✅ رفع الفيديو اكتمل بنجاح.");
+  } catch (error) {
+    console.error("❌ حدث خطأ أثناء رفع الفيديو:", error.message);
+    try {
+      await s3Client.send(
+        new AbortMultipartUploadCommand({
+          Bucket: process.env.CLOUDFLARE_R2_BUCKET_NAME,
+          Key: key,
+          UploadId,
+        })
+      );
+      console.log("🚫 تم إلغاء عملية الرفع.");
+    } catch (abortErr) {
+      console.error("❗ فشل إلغاء الرفع:", abortErr.message);
+      if (abortErr?.$response?.body) {
+        console.error("📄 الاستجابة:", abortErr.$response.body.toString?.());
+      }
+    }
+    throw error;
+  }
 }

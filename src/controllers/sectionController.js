@@ -21,6 +21,22 @@ const getSections = asyncHandler(async (req, res) => {
   }
 });
 
+
+/**
+ * @desc    Get sections by course ID
+ * @route   GET /api/sections/by-course/:courseId
+ * @access  Public
+ */
+const getSectionsByCourseId = asyncHandler(async (req, res) => {
+  try {
+    const courseId = req.params.courseId;
+    const sections = await Section.find({ course: courseId }).sort({ order: 1 });
+    res.json({ success: true, data: sections });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "خطأ في الخادم", error: error.message });
+  }
+});
+
 // @desc    Add a new section
 // @route   POST /api/sections
 // @access  Private/Admin
@@ -131,4 +147,4 @@ const deleteSection = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { getSections, addSection,editSection, deleteSection };
+module.exports = { getSections, addSection,editSection, deleteSection, getSectionsByCourseId };
