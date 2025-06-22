@@ -61,7 +61,7 @@ const getPack = asyncHandler(async (req, res) => {
   } catch (error) {
     res
       .status(500)
-      .json({ success: false, message: "حدث خطأ أثناء جلب الباقة" });
+      .json({ success: false });
   }
 });
 
