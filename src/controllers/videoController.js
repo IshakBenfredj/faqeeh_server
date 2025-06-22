@@ -1,5 +1,9 @@
 const asyncHandler = require("express-async-handler");
 const Video = require("../models/Video");
+const Pack = require("../models/Pack");
+const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+
 const extractIdFromUrl = require("../lib/extractIdFromUrl");
 const {
   uploadToR2,
@@ -237,38 +241,107 @@ const updateVideo = asyncHandler(async (req, res) => {
 
 // @route GET /api/videos/secure-url/:id
 // @access Private/Protected
+// const getSecureVideoUrl = asyncHandler(async (req, res) => {
+//   console.log("start");
+//   try {
+//     const video = await Video.findById(req.params.id).populate("course");
+//     if (!video || !video.video) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "الفيديو غير موجود" });
+//     }
+
+//     // Only generate signed URL for R2 videos
+//     if (video.video.includes("/videos/")) {
+//       const key = extractIdFromUrl(video.video);
+//       console.log("key", key);
+//       const signedUrl = await generateSignedUrl(
+//         `videos/${key}`,
+//         parseInt(video.duration) * 3
+//       );
+//       return res.json({ success: true, url: signedUrl });
+//     }
+
+//     // For external video links, return the URL directly
+//     res.json({ success: true, url: video.video });
+//   } catch (error) {
+//     console.error("Error generating secure URL:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "خطأ في توليد رابط الفيديو",
+//       error: error.message,
+//     });
+//   }
+// });
+
 const getSecureVideoUrl = asyncHandler(async (req, res) => {
   console.log("start");
+
   try {
     const video = await Video.findById(req.params.id).populate("course");
+
     if (!video || !video.video) {
       return res
         .status(404)
         .json({ success: false, message: "الفيديو غير موجود" });
     }
 
-    const isFree = video.isFree || (video.course && video.course.price === 0);
+    // ✅ Free video: allow access without auth
+    if (video.isFree) {
+      return generateAndSendSecureUrl(res, video);
+    }
 
-    if (!isFree && !req.user) {
+    // 🔐 Not free: require token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "يجب تسجيل الدخول للوصول إلى هذا الفيديو",
+        message: "الرمز مفقود، يجب تسجيل الدخول للوصول إلى هذا الفيديو",
       });
     }
 
-    // Only generate signed URL for R2 videos
-    if (video.video.includes("/videos/")) {
-      const key = extractIdFromUrl(video.video);
-      console.log("key", key);
-      const signedUrl = await generateSignedUrl(
-        `videos/${key}`,
-        parseInt(video.duration) * 3
-      );
-      return res.json({ success: true, url: signedUrl });
+    const token = authHeader.split(" ")[1];
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res
+        .status(401)
+        .json({ success: false, message: "رمز الدخول غير صالح أو منتهي" });
     }
 
-    // For external video links, return the URL directly
-    res.json({ success: true, url: video.video });
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    // ✅ Admins have full access
+    if (user.role === "admin") {
+      return generateAndSendSecureUrl(res, video);
+    }
+
+    // 🎓 Check if user purchased the course
+    const hasCourse = user.purchasedCourses.some((courseId) =>
+      courseId.equals(video.course._id)
+    );
+
+    // 📦 Check if user purchased a pack containing the course
+    const packs = await Pack.find({ _id: { $in: user.purchasedPacks } });
+    const hasPack = packs.some((pack) =>
+      pack.courses.some((courseId) => courseId.equals(video.course._id))
+    );
+
+    if (!hasCourse && !hasPack) {
+      return res.status(403).json({
+        success: false,
+        message: "ليس لديك صلاحية للوصول إلى هذا الفيديو",
+      });
+    }
+
+    return generateAndSendSecureUrl(res, video);
   } catch (error) {
     console.error("Error generating secure URL:", error);
     res.status(500).json({
@@ -278,6 +351,19 @@ const getSecureVideoUrl = asyncHandler(async (req, res) => {
     });
   }
 });
+
+async function generateAndSendSecureUrl(res, video) {
+  if (video.video.includes("/videos/")) {
+    const key = extractIdFromUrl(video.video);
+    const signedUrl = await generateSignedUrl(
+      `videos/${key}`,
+      parseInt(video.duration) * 3
+    );
+    return res.json({ success: true, url: signedUrl });
+  } else {
+    return res.json({ success: true, url: video.video });
+  }
+}
 
 // @desc    Delete a video
 // @route   DELETE /api/videos/:id
