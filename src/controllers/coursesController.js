@@ -104,6 +104,12 @@ const getCourses = asyncHandler(async (req, res) => {
       },
     ]);
 
+    courses.forEach((course) => {
+      if (Array.isArray(course.videos)) {
+        course.videos = course.videos.map(({ video, ...rest }) => rest);
+      }
+    });
+
     res.json(courses);
   } catch (error) {
     res
@@ -197,7 +203,11 @@ const getCourse = asyncHandler(async (req, res) => {
         duration: video.duration ?? 0,
         isFree: video.isFree,
         locked: !isAccessible,
-        ...(video.isFree && { video: video.video }),
+        ...((video.isFree ||
+          video.video.includes("youtube.com") ||
+          video.video.includes("youtu.be")) && {
+          video: video.video,
+        }),
         ...(isAccessible &&
           video.description && { description: video.description }),
       });

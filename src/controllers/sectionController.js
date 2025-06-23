@@ -69,17 +69,79 @@ const addSection = asyncHandler(async (req, res) => {
  * @route   PUT /api/sections/:id
  * @access  Private/Admin
  */
+// const editSection = asyncHandler(async (req, res) => {
+//   try {
+//     const { title, order } = req.body;
+//     const section = await Section.findById(req.params.id);
+
+//     if (!section) {
+//       return res.status(404).json({ success: false, message: "الوحدة غير موجود" });
+//     }
+
+//     if (title !== undefined) section.title = title;
+//     if (order !== undefined) section.order = order;
+
+//     await section.save();
+
+//     res.json({ success: true, message: "تم تحديث الوحدة", data: section });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: "خطأ في الخادم", error: error.message });
+//   }
+// });
+
+// @desc    Delete a section and optionally its videos
+// @route   DELETE /api/sections/:id/:deleteVideosAlso
+// @access  Private/Admin
+
 const editSection = asyncHandler(async (req, res) => {
   try {
-    const { title, order } = req.body;
+    const { title, order: orderRaw } = req.body;
     const section = await Section.findById(req.params.id);
 
     if (!section) {
-      return res.status(404).json({ success: false, message: "الوحدة غير موجود" });
+      return res.status(404).json({ success: false, message: "الوحدة غير موجودة" });
     }
 
+    const oldOrder = section.order;
+    const courseId = section.course;
+
+    const newOrder = orderRaw !== undefined ? parseInt(orderRaw, 10) : undefined;
+
+    // Update title if provided
     if (title !== undefined) section.title = title;
-    if (order !== undefined) section.order = order;
+
+    if (newOrder !== undefined && newOrder !== oldOrder) {
+      // Get the total number of sections for this course
+      const maxOrderSection = await Section.find({ course: courseId }).sort({ order: -1 }).limit(1);
+      const maxOrder = maxOrderSection.length > 0 ? maxOrderSection[0].order : 0;
+
+      // Clamp newOrder between 1 and maxOrder
+      const clampedOrder = Math.max(1, Math.min(newOrder, maxOrder));
+
+      if (clampedOrder < oldOrder) {
+        // Move up: shift others down
+        await Section.updateMany(
+          {
+            course: courseId,
+            order: { $gte: clampedOrder, $lt: oldOrder },
+            _id: { $ne: section._id },
+          },
+          { $inc: { order: 1 } }
+        );
+      } else if (clampedOrder > oldOrder) {
+        // Move down: shift others up
+        await Section.updateMany(
+          {
+            course: courseId,
+            order: { $gt: oldOrder, $lte: clampedOrder },
+            _id: { $ne: section._id },
+          },
+          { $inc: { order: -1 } }
+        );
+      }
+
+      section.order = clampedOrder;
+    }
 
     await section.save();
 
@@ -89,9 +151,7 @@ const editSection = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Delete a section and optionally its videos
-// @route   DELETE /api/sections/:id/:deleteVideosAlso
-// @access  Private/Admin
+
 const deleteSection = asyncHandler(async (req, res) => {
   try {
     const sectionId = req.params.id;
