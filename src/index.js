@@ -21,7 +21,7 @@ const job = require("./lib/cron");
 dotenv.config();
 
 const app = express();
-job.start();
+// job.start();
 
 // Middleware
 app.use(cors());
