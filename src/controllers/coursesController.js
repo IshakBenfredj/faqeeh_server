@@ -416,9 +416,10 @@ const getPurchasedCourses = asyncHandler(async (req, res) => {
     })
       .populate("category")
       .lean();
-
+    console.log('courses', courses)
     res.json(courses);
   } catch (error) {
+    console.log('error', error)
     res
       .status(500)
       .json({ success: false, message: "حدث خطأ أثناء جلب الدورات المشتراة" });

@@ -559,6 +559,116 @@ const getUsersWithoutPack = asyncHandler(async (req, res) => {
 
 
 /**
+ * @desc    Get purchased courses and packs for the logged-in user
+ * @route   GET /api/users/purchased
+ * @access  Private/User
+ */
+const getPurchasedItems = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select("purchasedCourses purchasedPacks")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "المستخدم غير موجود" });
+    }
+
+    // Purchased Courses
+    const courses = await Course.aggregate([
+      { $match: { _id: { $in: user.purchasedCourses }, isActive: true } },
+      {
+        $lookup: {
+          from: "videos",
+          localField: "_id",
+          foreignField: "course",
+          as: "videos",
+        },
+      },
+      {
+        $lookup: {
+          from: "ratings",
+          localField: "_id",
+          foreignField: "course",
+          as: "ratings",
+        },
+      },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "category",
+          foreignField: "_id",
+          as: "category",
+        },
+      },
+      {
+        $unwind: {
+          path: "$category",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $addFields: {
+          totalRatings: { $size: "$ratings" },
+          averageRating: {
+            $cond: [
+              { $gt: [{ $size: "$ratings" }, 0] },
+              { $avg: "$ratings.stars" },
+              0,
+            ],
+          },
+          duration: { $sum: "$videos.duration" },
+        },
+      },
+      {
+        $project: {
+          title: 1,
+          description: 1,
+          price: 1,
+          originalPrice: 1,
+          image: 1,
+          category: 1,
+          numOfVideos: { $size: "$videos" },
+          averageRating: 1,
+          totalRatings: 1,
+          duration: 1,
+          ratings: 1,
+          videos: 1,
+          isActive: 1,
+        },
+      },
+    ]);
+
+    // Purchased Packs
+    const packs = await Pack.find({ _id: { $in: user.purchasedPacks } })
+      .populate("courses")
+      .lean();
+
+    // Add studentsCount for each pack
+    const packsWithStudentsCount = await Promise.all(
+      packs.map(async (pack) => {
+        const studentsCount = await User.countDocuments({
+          purchasedPacks: pack._id,
+        });
+        return { ...pack, studentsCount };
+      })
+    );
+
+    // Remove video field from videos in courses (like getCourses)
+    courses.forEach((course) => {
+      if (Array.isArray(course.videos)) {
+        course.videos = course.videos.map(({ video, ...rest }) => rest);
+      }
+    });
+
+    res.json({ courses, packs: packsWithStudentsCount });
+  } catch (error) {
+    console.error("Get purchased items error:", error);
+    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب المشتريات" });
+  }
+});
+
+
+/**
  * @desc    Update general user info (excluding role and password)
  * @route   PUT /api/users/:userId/updateInfo
  * @access  Private
@@ -747,4 +857,5 @@ module.exports = {
   resetPassword,
   forgotPassword,
   logout,
+  getPurchasedItems
 };

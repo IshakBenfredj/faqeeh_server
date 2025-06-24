@@ -21,6 +21,7 @@ const {
   forgotPassword,
   resetPassword,
   logout,
+  getPurchasedItems,
 } = require("../controllers/userController");
 const { protect, admin } = require("../middleware/authMiddleware");
 
@@ -64,5 +65,6 @@ router.delete(
 );
 router.get("/withPack/:packId", protect, admin, getUsersWithPack);
 router.get("/withoutPack/:packId", protect, admin, getUsersWithoutPack);
+router.get("/purchased", protect, getPurchasedItems);
 
 module.exports = router;
