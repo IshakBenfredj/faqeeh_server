@@ -61,15 +61,16 @@ const register = asyncHandler(async (req, res) => {
       });
     }
 
-    const token = generateToken(user._id)
-
     const user = await User.create({
       fullName,
       email: email.toLowerCase(),
       phoneNumber,
       password,
-      token
     });
+    const token = generateToken(user._id);
+
+    user.token = token
+    await user.save()
 
     sendWelcomeEmail(user.email, user.fullName);
     res.status(201).json({
@@ -139,7 +140,8 @@ const login = asyncHandler(async (req, res) => {
 
     if (!allowLogin) {
       return res.status(403).json({
-        message: "تم تسجيل الدخول بالفعل من جهاز أو متصفح آخر. الرجاء تسجيل الخروج أولاً.",
+        message:
+          "تم تسجيل الدخول بالفعل من جهاز أو متصفح آخر. الرجاء تسجيل الخروج أولاً.",
         success: false,
       });
     }
@@ -173,14 +175,18 @@ const logout = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("+token");
     if (!user) {
-      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+      return res
+        .status(404)
+        .json({ message: "المستخدم غير موجود", success: false });
     }
     user.token = null;
     await user.save();
     res.status(200).json({ message: "تم تسجيل الخروج بنجاح", success: true });
   } catch (error) {
     console.error("Logout error:", error);
-    res.status(500).json({ message: "حدث خطأ أثناء تسجيل الخروج", success: false });
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء تسجيل الخروج", success: false });
   }
 });
 
@@ -193,16 +199,20 @@ const getCurrentUser = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select("-password");
     if (!user) {
-      return res.status(401).json({ message: "المستخدم غير موجود", success: false });
+      return res
+        .status(401)
+        .json({ message: "المستخدم غير موجود", success: false });
     }
     res.status(200).json(user);
   } catch (error) {
     console.error("Get current user error:", error);
-    res.status(500).json({ message: "حدث خطأ أثناء جلب المستخدم", success: false });
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء جلب المستخدم", success: false });
   }
 });
 
-// @desc    Get users 
+// @desc    Get users
 // @route   GET /api/users
 // @access  Private
 const getUsers = asyncHandler(async (req, res) => {
@@ -222,7 +232,7 @@ const getUsers = asyncHandler(async (req, res) => {
 // @route   PUT /api/users/addCourse
 // @access  Private
 const addCourseToUsers = asyncHandler(async (req, res) => {
-  const { userIds, courseId } = req.body; 
+  const { userIds, courseId } = req.body;
 
   try {
     const users = await User.find({ _id: { $in: userIds } });
@@ -242,21 +252,17 @@ const addCourseToUsers = asyncHandler(async (req, res) => {
     }
 
     if (updatedUsers.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "الدورة مضافة بالفعل لجميع المستخدمين",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "الدورة مضافة بالفعل لجميع المستخدمين",
+        success: false,
+      });
     }
 
-    res
-      .status(200)
-      .json({
-        message: "تمت إضافة الدورة بنجاح للمستخدمين",
-        success: true,
-        data :updatedUsers,
-      });
+    res.status(200).json({
+      message: "تمت إضافة الدورة بنجاح للمستخدمين",
+      success: true,
+      data: updatedUsers,
+    });
   } catch (error) {
     console.error("Add course error:", error);
     res
@@ -341,12 +347,17 @@ const removeCourseFromUser = asyncHandler(async (req, res) => {
     );
     await user.save();
 
-    res.status(200).json({ message: "تمت إزالة الطالب من الدورة بنجاح", success: true });
+    res
+      .status(200)
+      .json({ message: "تمت إزالة الطالب من الدورة بنجاح", success: true });
   } catch (error) {
     console.error("Remove course error:", error);
     res
       .status(500)
-      .json({ message: "حدث خطأ أثناء إزالة الطالب من الدورة", success: false });
+      .json({
+        message: "حدث خطأ أثناء إزالة الطالب من الدورة",
+        success: false,
+      });
   }
 });
 
@@ -357,7 +368,10 @@ const getUsersWithCourse = asyncHandler(async (req, res) => {
   const { courseId } = req.params;
 
   try {
-    const users = await User.find({ purchasedCourses: courseId, role: { $ne: "admin" } });
+    const users = await User.find({
+      purchasedCourses: courseId,
+      role: { $ne: "admin" },
+    });
 
     res.status(200).json(users);
   } catch (error) {
@@ -388,7 +402,6 @@ const getUsersWithoutCourse = asyncHandler(async (req, res) => {
 
 // +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
 // @desc    Add course to user's purchasedPacks
 // @route   PUT /api/users/addPack
 // @access  Private
@@ -413,21 +426,17 @@ const addPackToUsers = asyncHandler(async (req, res) => {
     }
 
     if (updatedUsers.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "الباقة مضافة بالفعل لجميع المستخدمين",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "الباقة مضافة بالفعل لجميع المستخدمين",
+        success: false,
+      });
     }
 
-    res
-      .status(200)
-      .json({
-        message: "تمت إضافة الباقة بنجاح للمستخدمين",
-        success: true,
-        data :updatedUsers,
-      });
+    res.status(200).json({
+      message: "تمت إضافة الباقة بنجاح للمستخدمين",
+      success: true,
+      data: updatedUsers,
+    });
   } catch (error) {
     console.error("Add error:", error);
     res
@@ -512,12 +521,17 @@ const removePackFromUser = asyncHandler(async (req, res) => {
     );
     await user.save();
 
-    res.status(200).json({ message: "تمت إزالة الطالب من الباقة بنجاح", success: true });
+    res
+      .status(200)
+      .json({ message: "تمت إزالة الطالب من الباقة بنجاح", success: true });
   } catch (error) {
     console.error("Remove pack error:", error);
     res
       .status(500)
-      .json({ message: "حدث خطأ أثناء إزالة الطالب من الباقة", success: false });
+      .json({
+        message: "حدث خطأ أثناء إزالة الطالب من الباقة",
+        success: false,
+      });
   }
 });
 
@@ -528,7 +542,10 @@ const getUsersWithPack = asyncHandler(async (req, res) => {
   const { packId } = req.params;
 
   try {
-    const users = await User.find({ purchasedPacks: packId, role: { $ne: "admin" } });
+    const users = await User.find({
+      purchasedPacks: packId,
+      role: { $ne: "admin" },
+    });
 
     res.status(200).json(users);
   } catch (error) {
@@ -557,7 +574,6 @@ const getUsersWithoutPack = asyncHandler(async (req, res) => {
   }
 });
 
-
 /**
  * @desc    Get purchased courses and packs for the logged-in user
  * @route   GET /api/users/purchased
@@ -570,7 +586,9 @@ const getPurchasedItems = asyncHandler(async (req, res) => {
       .lean();
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "المستخدم غير موجود" });
+      return res
+        .status(404)
+        .json({ success: false, message: "المستخدم غير موجود" });
     }
 
     // Purchased Courses
@@ -663,10 +681,11 @@ const getPurchasedItems = asyncHandler(async (req, res) => {
     res.json({ courses, packs: packsWithStudentsCount });
   } catch (error) {
     console.error("Get purchased items error:", error);
-    res.status(500).json({ success: false, message: "حدث خطأ أثناء جلب المشتريات" });
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء جلب المشتريات" });
   }
 });
-
 
 /**
  * @desc    Update general user info (excluding role and password)
@@ -680,17 +699,26 @@ const updateUserInfo = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+      return res
+        .status(404)
+        .json({ message: "المستخدم غير موجود", success: false });
     }
 
     if (req.body.role || req.body.password) {
-      return res.status(400).json({ message: "لا يمكن تعديل الدور أو كلمة المرور من هنا", success: false });
+      return res
+        .status(400)
+        .json({
+          message: "لا يمكن تعديل الدور أو كلمة المرور من هنا",
+          success: false,
+        });
     }
 
     if (email && email.toLowerCase() !== user.email) {
       const emailExists = await User.findOne({ email: email.toLowerCase() });
       if (emailExists) {
-        return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل", success: false });
+        return res
+          .status(400)
+          .json({ message: "البريد الإلكتروني مستخدم بالفعل", success: false });
       }
       user.email = email.toLowerCase();
     }
@@ -700,10 +728,14 @@ const updateUserInfo = asyncHandler(async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "تم تحديث المعلومات بنجاح", success: true, user });
+    res
+      .status(200)
+      .json({ message: "تم تحديث المعلومات بنجاح", success: true, user });
   } catch (error) {
     console.error("Update user info error:", error);
-    res.status(500).json({ message: "حدث خطأ أثناء تحديث المعلومات", success: false });
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء تحديث المعلومات", success: false });
   }
 });
 
@@ -719,24 +751,31 @@ const updateUserPassword = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(userId).select("+password");
     if (!user) {
-      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+      return res
+        .status(404)
+        .json({ message: "المستخدم غير موجود", success: false });
     }
 
     const isMatch = await user.comparePassword(oldPassword);
     if (!isMatch) {
-      return res.status(400).json({ message: "كلمة المرور القديمة غير صحيحة", success: false });
+      return res
+        .status(400)
+        .json({ message: "كلمة المرور القديمة غير صحيحة", success: false });
     }
 
     user.password = newPassword;
     await user.save();
 
-    res.status(200).json({ message: "تم تحديث كلمة المرور بنجاح", success: true });
+    res
+      .status(200)
+      .json({ message: "تم تحديث كلمة المرور بنجاح", success: true });
   } catch (error) {
     console.error("Update password error:", error);
-    res.status(500).json({ message: "حدث خطأ أثناء تحديث كلمة المرور", success: false });
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء تحديث كلمة المرور", success: false });
   }
 });
-
 
 /**
  * @desc    Delete a user (role not equal to admin)
@@ -749,11 +788,15 @@ const deleteUser = asyncHandler(async (req, res) => {
   try {
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "المستخدم غير موجود", success: false });
+      return res
+        .status(404)
+        .json({ message: "المستخدم غير موجود", success: false });
     }
 
     if (user.role === "admin") {
-      return res.status(403).json({ message: "لا يمكن حذف حساب المدير", success: false });
+      return res
+        .status(403)
+        .json({ message: "لا يمكن حذف حساب المدير", success: false });
     }
 
     await user.deleteOne();
@@ -761,7 +804,9 @@ const deleteUser = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "تم حذف المستخدم بنجاح", success: true });
   } catch (error) {
     console.error("Delete user error:", error);
-    res.status(500).json({ message: "حدث خطأ أثناء حذف المستخدم", success: false });
+    res
+      .status(500)
+      .json({ message: "حدث خطأ أثناء حذف المستخدم", success: false });
   }
 });
 
@@ -781,7 +826,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
     }
 
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    
+
     const message = "السلام عليكم، هذا هو رمز إعادة تعيين كلمة المرور الخاص بك";
     const title = "إعادة تعيين كلمة المرور";
     await sendMail(email, resetCode, title, message);
@@ -807,7 +852,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 const resetPassword = asyncHandler(async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-    
+
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -833,8 +878,6 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 });
 
-
-
 module.exports = {
   register,
   login,
@@ -857,5 +900,5 @@ module.exports = {
   resetPassword,
   forgotPassword,
   logout,
-  getPurchasedItems
+  getPurchasedItems,
 };
