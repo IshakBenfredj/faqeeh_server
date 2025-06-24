@@ -8,7 +8,9 @@ exports.createQuiz = async (req, res) => {
     const { courseId, questions } = req.body;
     const quiz = new Quiz({ course: courseId, questions });
     await quiz.save();
-    res.status(201).json({ message: "تم إنشاء الاختبار بنجاح", quiz });
+    res
+      .status(201)
+      .json({ message: "تم إنشاء الاختبار بنجاح", data: quiz, success: true });
   } catch (error) {
     console.log("error", error);
     res.status(500).json({ message: "حدث خطأ أثناء إنشاء الاختبار", error });
@@ -30,23 +32,30 @@ exports.getRandomQuestions = async (req, res) => {
     const user = await User.findById(req.user._id);
     const isAdmin = user && user.role === "admin";
 
-    const questions = quiz.questions
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 10)
-      .map((q) => ({
+    let questions;
+    if (isAdmin) {
+      questions = quiz.questions.map((q) => ({
         _id: q._id,
         text: q.text,
-        options: q.options.map((opt) => {
-          const optionObj = {
-            _id: opt._id,
-            text: opt.text
-          };
-          if (isAdmin) {
-            optionObj.isCorrect = opt.isCorrect;
-          }
-          return optionObj;
-        })
+        options: q.options.map((opt) => ({
+          _id: opt._id,
+          text: opt.text,
+          isCorrect: opt.isCorrect,
+        })),
       }));
+    } else {
+      questions = quiz.questions
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 10)
+        .map((q) => ({
+          _id: q._id,
+          text: q.text,
+          options: q.options.map((opt) => ({
+            _id: opt._id,
+            text: opt.text,
+          })),
+        }));
+    }
 
     res.json({ questions });
   } catch (error) {
@@ -106,17 +115,16 @@ exports.submitQuiz = async (req, res) => {
   }
 };
 
-
 // Delete quiz (Admin only)
 exports.deleteQuiz = async (req, res) => {
   try {
     const { courseId } = req.params;
-    
+
     await Promise.all([
       Quiz.findOneAndDelete({ course: courseId }),
-      UserQuizResult.deleteMany({ course: courseId })
+      UserQuizResult.deleteMany({ course: courseId }),
     ]);
-    
+
     res.json({ message: "تم حذف الاختبار بنجاح" });
   } catch (error) {
     res.status(500).json({ message: "حدث خطأ أثناء حذف الاختبار", error });

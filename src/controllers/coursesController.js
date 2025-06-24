@@ -396,6 +396,35 @@ const updateCourseStatus = asyncHandler(async (req, res) => {
   }
 });
 
+/**
+ * @desc    Get purchased courses for the logged-in user
+ * @route   GET /api/courses/purchased
+ * @access  Private/User
+ */
+const getPurchasedCourses = asyncHandler(async (req, res) => {
+  try {
+    // req.user is set by authentication middleware
+    const user = req.user;
+    if (!user || !user.purchasedCourses || !user.purchasedCourses.length) {
+      return res.json([]);
+    }
+
+    // Only fetch courses that the user purchased and are active
+    const courses = await Course.find({
+      _id: { $in: user.purchasedCourses },
+      isActive: true,
+    })
+      .populate("category")
+      .lean();
+
+    res.json(courses);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, message: "حدث خطأ أثناء جلب الدورات المشتراة" });
+  }
+});
+
 // @desc    Delete course
 // @route   DELETE /api/courses/:id
 // @access  Private/Admin
@@ -427,4 +456,5 @@ module.exports = {
   updateCourse,
   deleteCourse,
   updateCourseStatus,
+  getPurchasedCourses
 };
