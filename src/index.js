@@ -25,7 +25,6 @@ const app = express();
 
 const allowedOrigins = ["https://faqeeh.academy", "https://www.faqeeh.academy"];
 
-// Middleware
 const corsOptions = {
   origin: (origin, callback) => {
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
@@ -46,6 +45,18 @@ if (process.env.NODE_ENV === "development") {
 if (process.env.NODE_ENV === "production") {
   app.use(morgan("combined"));
 }
+
+app.use((req, res, next) => {
+  const customerHeader = req.headers["x-custom-header"];
+  if (
+    !customerHeader ||
+    customerHeader !== "faqeehSecret"
+  ) {
+    res.status(403).send("Access impossible");
+  } else {
+    next();
+  }
+});
 
 // Database connection
 mongoose
