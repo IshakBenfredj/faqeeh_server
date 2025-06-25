@@ -11,10 +11,10 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const ratingRoutes = require("./routes/ratingRoutes");
 const videosRoutes = require("./routes/videoRoutes");
 const sectionRoutes = require("./routes/sectionRoutes");
-const quizRoutes = require('./routes/quizRoutes');
-const messageRoutes = require('./routes/messageRoutes');
-const statisticsRoutes = require('./routes/statisticsRoutes');
-const uploadsRoutes = require('./routes/uploadRoutes');
+const quizRoutes = require("./routes/quizRoutes");
+const messageRoutes = require("./routes/messageRoutes");
+const statisticsRoutes = require("./routes/statisticsRoutes");
+// const uploadsRoutes = require("./routes/uploadRoutes");
 const errorHandler = require("./lib/errorHandler");
 const job = require("./lib/cron");
 
@@ -23,16 +23,29 @@ dotenv.config();
 const app = express();
 // job.start();
 
+const allowedOrigins = ["https://faqeeh.academy", "https://www.faqeeh.academy"];
+
 // Middleware
-app.use(cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+};
+app.use(cors(corsOptions));
 app.use(helmet());
-app.use(morgan("dev"));
-app.use(express.json({ limit: '5gb' }));
-app.use(express.urlencoded({ limit: '5gb', extended: true }));
-app.use(express.raw({ 
-  type: 'application/octet-stream',
-  limit: '5gb' 
-}));
+app.use(express.json({ limit: "5gb" }));
+app.use(express.urlencoded({ limit: "5gb", extended: true }));
+
+if (process.env.NODE_ENV === "development") {
+  app.use(morgan("dev"));
+}
+if (process.env.NODE_ENV === "production") {
+  app.use(morgan("combined"));
+}
 
 // Database connection
 mongoose
@@ -48,16 +61,16 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/ratings", ratingRoutes);
 app.use("/api/videos", videosRoutes);
 app.use("/api/sections", sectionRoutes);
-app.use('/api/quizzes', quizRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/statistics', statisticsRoutes);
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api/uploads/upload-part")) {
-    return next();
-  }
-  express.json()(req, res, next);
-});
-app.use('/api/uploads', uploadsRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/statistics", statisticsRoutes);
+// app.use((req, res, next) => {
+//   if (req.path.startsWith("/api/uploads/upload-part")) {
+//     return next();
+//   }
+//   express.json()(req, res, next);
+// });
+// app.use("/api/uploads", uploadsRoutes);
 
 // Error handler
 app.use(errorHandler);
