@@ -21,7 +21,7 @@ const job = require("./lib/cron");
 dotenv.config();
 
 const app = express();
-// job.start();
+job.start();
 
 const allowedOrigins = ["https://faqeeh.academy", "https://www.faqeeh.academy"];
 
