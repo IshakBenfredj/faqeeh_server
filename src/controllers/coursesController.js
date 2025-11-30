@@ -294,8 +294,8 @@ const getCourse = asyncHandler(async (req, res) => {
 const createCourse = asyncHandler(async (req, res) => {
   try {
     const { title, description, price, originalPrice, category } = req.body;
-    const filePath = req.file.path;
-
+    const filePath = req.file.buffer;
+    
     const result = await uploadImageToCloudinary(filePath);
 
     const course = await Course.create({
@@ -333,16 +333,15 @@ const updateCourse = asyncHandler(async (req, res) => {
       return;
     }
 
-    console.log("price", price);
 
     let url = "";
-    if (req.file?.path) {
+    if (req.file?.buffer) {
       const oldImgId = course.image ? extractIdFromUrl(course.image) : "";
       if (oldImgId) {
         await deleteFromCloudinary(oldImgId);
       }
 
-      const uploadResult = await uploadImageToCloudinary(req.file.path);
+      const uploadResult = await uploadImageToCloudinary(req.file.buffer);
       url = uploadResult.url;
     }
 
@@ -361,6 +360,7 @@ const updateCourse = asyncHandler(async (req, res) => {
       data: updatedCourse,
     });
   } catch (error) {
+    console.log("update course error", error);
     res
       .status(500)
       .json({ success: false, message: "حدث خطأ أثناء تحديث الدورة" });
