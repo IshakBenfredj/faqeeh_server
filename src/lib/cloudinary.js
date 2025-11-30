@@ -9,10 +9,18 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadImageToCloudinary = async (filePath) => {
-  const result = await cloudinary.uploader.upload(filePath);
-  // fs.unlinkSync(filePath);
-  return result;
+const uploadImageToCloudinary = (buffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: "courses" },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result);
+      }
+    );
+
+    stream.end(buffer);
+  });
 };
 
 const uploadVideoToCloudinary = async (filePath) => {
