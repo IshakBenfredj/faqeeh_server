@@ -23,7 +23,7 @@ dotenv.config();
 const app = express();
 job.start();
 
-const allowedOrigins = ["https://faqeeh.academy", "https://www.faqeeh.academy"];
+const allowedOrigins = ["https://faqeeh.academy", "https://www.faqeeh.academy","https://faqeeh-academy-two.vercel.app"];
 
 const corsOptions = {
   origin: (origin, callback) => {
